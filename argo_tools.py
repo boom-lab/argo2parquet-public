@@ -97,7 +97,7 @@ def argo_gdac(gdac_path='./argo_synthetic-profile_index.txt',lat_range=None,lon_
     # Examine subsetted profiles
     wmoids = gdac_index_subset['wmoid'].unique()
     wmoid_filepaths = gdac_index_subset['filepath_main'].unique()
-    return wmoids, gdac_index_subset
+    return wmoids, gdac_index_subset, wmoid_filepaths
   # Just return list of floats and DataFrame with subset of index file, or download each profile
     if not skip_download:
         downloaded_filenames = download_profiles(df,localroot='~/Documents/gdac1')
