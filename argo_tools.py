@@ -14,9 +14,9 @@ from multiprocessing.pool import ThreadPool
 
 root = '.'
 # Function to download and parse GDAC synthetic profile index file
-def argo_gdac(gdac_path='./argo_synthetic-profile_index.txt',lat_range=None,lon_range=None,start_date=None,end_date=None,sensors=None,floats=None,skip_downloads=True,verbose=True):
-    """ Downloads GDAC Sprof index file, then selects float profiles based on criteria.
-      Either returns information on profiles and floats (if skip_download=True) or downloads them (if False).
+def argo_gdac(gdac_path='./argo_synthetic-profile_index.txt',lat_range=None,lon_range=None,start_date=None,end_date=None,sensors=None,floats=None,overwrite_profiles=False,skip_downloads=True,download_individual_profs=False,save_to=None,verbose=True,dryrun=False,dac_url_root=None):
+    """Downloads GDAC Sprof index file, then selects float profiles based on criteria.
+      Either returns information on profiles and floats (if skip_downloads=True) or downloads them (if False).
 
       Arguments:
           lat_range: None, to select all latitudes
@@ -34,7 +34,7 @@ def argo_gdac(gdac_path='./argo_synthetic-profile_index.txt',lat_range=None,lon_
                   or int or list of ints specifying floats' WMOID numbers
           overwrite_index: False to keep existing downloaded GDAC index file, or True to download new index
           overwrite_profiles: False to keep existing downloaded profile files, or True to download new files
-          skip_download: True to skip download and return: (<list of WMOIDs>, <DataFrame of index file subset>,
+          skip_downloads: True to skip download and return: (<list of WMOIDs>, <DataFrame of index file subset>,
                                                             <list of downloaded filenames [if applicable]>)
                          or False to download those profiles
           download_individual_profs: False to download single Sprof file containing all profiles for each float
@@ -42,10 +42,13 @@ def argo_gdac(gdac_path='./argo_synthetic-profile_index.txt',lat_range=None,lon_
           save_to: None to download to Google Drive "/GO-BGC Workshop/Profiles" directory
                    or string to specify directory path for profile downloads
           verbose: True to announce progress, or False to stay silent
+          dryrun: If True, returns list of filenames that would be downloaded, without
+                  downloading them (note that it requires skip_downloads=False)
+          dac_url_root: root directory to download/copy data from
 
-"""
+    """
     gdac_index = pd.read_csv(gdac_path,delimiter=',',header=8,parse_dates=['date','date_update'],
-                          date_parser=lambda x: pd.to_datetime(x,format='%Y%m%d%H%M%S'))
+                             date_parser=lambda x: pd.to_datetime(x,format='%Y%m%d%H%M%S'))
 
 
   # Load index file into Pandas DataFrame
@@ -73,15 +76,15 @@ def argo_gdac(gdac_path='./argo_synthetic-profile_index.txt',lat_range=None,lon_
 
     # Subset profiles based on time and space criteria
     gdac_index_subset = gdac_index.loc[np.logical_and.reduce([gdac_index['latitude'] >= lat_range[0],
-                                                            gdac_index['latitude'] <= lat_range[1],
-                                                            gdac_index['date'] >= start_date,
-                                                            gdac_index['date'] <= end_date]),:]
+                                                              gdac_index['latitude'] <= lat_range[1],
+                                                              gdac_index['date'] >= start_date,
+                                                              gdac_index['date'] <= end_date]),:]
     if lon_range[1] >= lon_range[0]:    # range does not cross -180/180 or 0/360
         gdac_index_subset = gdac_index_subset.loc[np.logical_and(gdac_index_subset['longitude'] >= lon_range[0],
-                                                             gdac_index_subset['longitude'] <= lon_range[1])]
+                                                                 gdac_index_subset['longitude'] <= lon_range[1])]
     elif lon_range[1] < lon_range[0]:   # range crosses -180/180 or 0/360
         gdac_index_subset = gdac_index_subset.loc[np.logical_or(gdac_index_subset['longitude'] >= lon_range[0],
-                                                            gdac_index_subset['longitude'] <= lon_range[1])]
+                                                                gdac_index_subset['longitude'] <= lon_range[1])]
 
     # If requested, subset profiles using float WMOID criteria
     if floats is not None:
@@ -97,26 +100,37 @@ def argo_gdac(gdac_path='./argo_synthetic-profile_index.txt',lat_range=None,lon_
     # Examine subsetted profiles
     wmoids = gdac_index_subset['wmoid'].unique()
     wmoid_filepaths = gdac_index_subset['filepath_main'].unique()
-    return wmoids, gdac_index_subset, wmoid_filepaths
-  # Just return list of floats and DataFrame with subset of index file, or download each profile
-    if not skip_download:
-        downloaded_filenames = download_profiles(df,localroot='~/Documents/gdac1')
-"""   if not skip_download:
-    downloaded_filenames = []
-    if download_individual_profs:
-      for p_idx in gdac_index_subset.index:
-        download_file(dac_url_root + gdac_index_subset.loc[p_idx]['filepath'],
-                      gdac_index_subset.loc[p_idx]['filename'],
-                      save_to=save_to,overwrite=overwrite_profiles,verbose=verbose)
-        downloaded_filenames.append(gdac_index_subset.loc[p_idx]['filename'])
+
+    # Just return list of floats and DataFrame with subset of index file, or download each profile
+    if not skip_downloads:
+        downloaded_filenames = []
+        if dac_url_root is None:
+            dac_url_root = 'https://usgodae.org/pub/outgoing/argo/dac/'
+
+        if download_individual_profs:
+            for p_idx in gdac_index_subset.index:
+                filename = gdac_index_subset.loc[p_idx]['filename']
+                downloaded_filenames.append(filename)
+                if not dryrun: # it still returns the filename that would be downloaded
+                    filepath = os.path.join('dac',gdac_index_subset.loc[p_idx]['filepath'])
+                    localpath = Path('./gdac',filepath)
+                    localpath.mkdir(parents= True, exist_ok= True)
+                    download_file(dac_url_root + gdac_index_subset.loc[p_idx]['filepath'],
+                                  filename,
+                                  save_to=save_to,overwrite=overwrite_profiles,verbose=verbose)
+        else:
+            for f_idx, wmoid_filepath in enumerate(wmoid_filepaths):
+                downloaded_filenames.append(str(wmoids[f_idx]) + '_Sprof.nc')
+                if not dryrun: # it still returns the filename that would be downloaded
+                    download_file(dac_url_root + wmoid_filepath,str(wmoids[f_idx]) + '_Sprof.nc',
+                                  save_to=save_to,overwrite=overwrite_profiles,verbose=verbose)
+
+        if (not dryrun) and verbose: print("All requested files have been downloaded.")
+
+        return wmoids, gdac_index_subset, downloaded_filenames
+
     else:
-      for f_idx, wmoid_filepath in enumerate(wmoid_filepaths):
-        download_file(dac_url_root + wmoid_filepath,str(wmoids[f_idx]) + '_Sprof.nc',
-                      save_to=save_to,overwrite=overwrite_profiles,verbose=verbose)
-        downloaded_filenames.append(str(wmoids[f_idx]) + '_Sprof.nc')
-    return wmoids, gdac_index_subset, downloaded_filenames
-  else:
-    return wmoids, gdac_index_subset """
+        return wmoids, gdac_index_subset
 
 # download all individual profiles in df
 def download_profiles(df,gdac_root='https://www.usgodae.org/ftp/outgoing/argo/',local_root='./gdac',overwrite=False,verbose=True):
@@ -165,6 +179,7 @@ def download_file(url_path,filename,save_to=None,overwrite=False,verbose=True):
     if save_to is None:
       save_to = root
     localfile = os.path.join(save_to,filename)
+    if verbose: print('>>>> Destination file: ' + str(localfile) + '.')
     try:
       if os.path.exists(localfile):
           if not overwrite:
@@ -184,7 +199,7 @@ def download_file(url_path,filename,save_to=None,overwrite=False,verbose=True):
       response = get_func(url_path + filename,stream=True)
 
       if response.status_code == 404:
-          if verbose: print('>>> File ' + filename + ' returned 404 error during download.')
+          if verbose: print('>>> File ' + filename + ' returned 404 error during download (requested URL: ' + str(url_path) + ').')
           return
       with open(save_to + filename,'wb') as out_file:
           shutil.copyfileobj(response.raw,out_file)
