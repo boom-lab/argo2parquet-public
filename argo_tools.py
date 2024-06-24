@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from dateutil.parser import parse as parsedate
 import requests
 import time
 import os
@@ -154,12 +155,12 @@ def download_profiles(df,gdac_root='https://www.usgodae.org/ftp/outgoing/argo/',
                       save_to=str(localpath)+ '/',overwrite=overwrite,verbose=verbose)
         downloaded_filenames.append(filename)
     return downloaded_filenames
-    
+
 
 
 # Function to download a single file
-def download_file(url_path,filename,save_to=None,overwrite=False,verbose=True):
-    """ Downloads and saves a file from a given URL using HTTP protocol.
+def download_file(url_path,filename,save_to=None,overwrite=False,verbose=True,checktime=True):
+    """Downloads and saves a file from a given URL using HTTP protocol.
 
     Note: If '404 file not found' error returned, function will return without downloading anything.
     
@@ -169,42 +170,69 @@ def download_file(url_path,filename,save_to=None,overwrite=False,verbose=True):
         save_to: None (to download to root Google Drive GO-BGC directory)
                  or directory path
         overwrite: False to leave existing files in place
-                   or True to overwrite existing files
+                   or True to overwrite existing files (neglected if checktime is true)
+        checktime: downloads only file at url_path is newer than file on disk
+                   (overwrite flag is neglected)
         verbose: True to announce progress
                  or False to stay silent
-    
+
     """
+
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     if save_to is None:
-      save_to = root
+        save_to = root
     localfile = os.path.join(save_to,filename)
     if verbose: print('>>>> Destination file: ' + str(localfile) + '.')
     try:
-      if os.path.exists(localfile):
-          if not overwrite:
-              if verbose: print('>>> File ' + filename + ' already exists. Leaving current version.')
-              return
-          else:
-              if verbose: print('>>> File ' + filename + ' already exists. Overwriting with new version.')
 
-      def get_func(url,stream=True):
-          try:
-              return requests.get(url,stream=stream,auth=None,verify=False)
-          except requests.exceptions.ConnectionError as error_tag:
-              print('Error connecting:',error_tag)
-              time.sleep(1)
-              return get_func(url,stream=stream)
+        def get_time_url(url):
+            try:
+                r = requests.head(url)
+                url_time = r.headers['last-modified']
+                return parsedate(url_time)
+            except requests.exceptions.RequestException as e:
+                print("Request failed:", e)
+            except requests.exceptions.HTTPError as e:
+                print("HTTP error occurred:", e)
+                print("Status code:", response.status_code)
+                print("Response content:", response.text)
+            except Exception as e:
+                print("Other error occurred:", e)
 
-      response = get_func(url_path + filename,stream=True)
+        if os.path.exists(localfile):
+            if checktime:
+                current_file_time = datetime.fromtimestamp(os.path.getmtime(localfile))
+                new_file_time = get_time_url(url_path + filename)
+                tz = new_file_time.tzinfo
+                current_file_time = current_file_time.replace(tzinfo=tz).astimezone(tz)
+                if not new_file_time > current_file_time:
+                    if verbose: print('>>> File ' + filename + ' on disk newer than file at requested URL (' + str(url_path) + ') and is not downloaded.')
+                    return
 
-      if response.status_code == 404:
-          if verbose: print('>>> File ' + filename + ' returned 404 error during download (requested URL: ' + str(url_path) + ').')
-          return
-      with open(save_to + filename,'wb') as out_file:
-          shutil.copyfileobj(response.raw,out_file)
-      del response
-      if verbose: print('>>> Successfully downloaded ' + filename + '.')
+            elif not overwrite:
+                if verbose: print('>>> File ' + filename + ' already exists. Leaving current version.')
+                return
+            else:
+                if verbose: print('>>> File ' + filename + ' already exists. Overwriting with new version.')
+
+        def get_func(url,stream=True):
+            try:
+                return requests.get(url,stream=stream,auth=None,verify=False)
+            except requests.exceptions.ConnectionError as error_tag:
+                print('Error connecting:',error_tag)
+                time.sleep(1)
+                return get_func(url,stream=stream)
+
+        response = get_func(url_path + filename,stream=True)
+
+        if response.status_code == 404:
+            if verbose: print('>>> File ' + filename + ' returned 404 error during download (requested URL: ' + str(url_path) + ').')
+            return
+        with open(save_to + filename,'wb') as out_file:
+            shutil.copyfileobj(response.raw,out_file)
+            del response
+        if verbose: print('>>> Successfully downloaded ' + filename + '.')
 
     except:
-      if verbose: print('>>> An error occurred while trying to download ' + filename + '.')
+        if verbose: print('>>> An error occurred while trying to download ' + filename + '.')
