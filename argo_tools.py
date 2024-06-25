@@ -15,7 +15,7 @@ from multiprocessing.pool import ThreadPool
 
 root = '.'
 # Function to download and parse GDAC synthetic profile index file
-def argo_gdac(gdac_path='./argo_synthetic-profile_index.txt',lat_range=None,lon_range=None,start_date=None,end_date=None,sensors=None,floats=None,overwrite_profiles=False,skip_downloads=True,download_individual_profs=False,save_to=None,verbose=True,dryrun=False,dac_url_root=None):
+def argo_gdac(gdac_path='./argo_synthetic-profile_index.txt',lat_range=None,lon_range=None,start_date=None,end_date=None,sensors=None,floats=None,overwrite_profiles=False,skip_downloads=True,download_individual_profs=False,save_to=None,verbose=True,dryrun=False,dac_url_root=None,checktime=True):
     """Downloads GDAC Sprof index file, then selects float profiles based on criteria.
       Either returns information on profiles and floats (if skip_downloads=True) or downloads them (if False).
 
@@ -45,6 +45,8 @@ def argo_gdac(gdac_path='./argo_synthetic-profile_index.txt',lat_range=None,lon_
           verbose: True to announce progress, or False to stay silent
           dryrun: If True, returns list of filenames that would be downloaded, without
                   downloading them (note that it requires skip_downloads=False)
+          checktime: download files from repository only if they are newer than files
+                    on disk (overwrite flag is neglected if true)
           dac_url_root: root directory to download/copy data from
 
     """
@@ -118,13 +120,13 @@ def argo_gdac(gdac_path='./argo_synthetic-profile_index.txt',lat_range=None,lon_
                     localpath.mkdir(parents= True, exist_ok= True)
                     download_file(dac_url_root + gdac_index_subset.loc[p_idx]['filepath'],
                                   filename,
-                                  save_to=save_to,overwrite=overwrite_profiles,verbose=verbose)
+                                  save_to=save_to,overwrite=overwrite_profiles,verbose=verbose,checktime=checktime)
         else:
             for f_idx, wmoid_filepath in enumerate(wmoid_filepaths):
                 downloaded_filenames.append(str(wmoids[f_idx]) + '_Sprof.nc')
                 if not dryrun: # it still returns the filename that would be downloaded
                     download_file(dac_url_root + wmoid_filepath,str(wmoids[f_idx]) + '_Sprof.nc',
-                                  save_to=save_to,overwrite=overwrite_profiles,verbose=verbose)
+                                  save_to=save_to,overwrite=overwrite_profiles,verbose=verbose,checktime=checktime)
 
         if (not dryrun) and verbose: print("All requested files have been downloaded.")
 
@@ -134,7 +136,7 @@ def argo_gdac(gdac_path='./argo_synthetic-profile_index.txt',lat_range=None,lon_
         return wmoids, gdac_index_subset
 
 # download all individual profiles in df
-def download_profiles(df,gdac_root='https://www.usgodae.org/ftp/outgoing/argo/',local_root='./gdac',overwrite=False,verbose=True):
+def download_profiles(df,gdac_root='https://www.usgodae.org/ftp/outgoing/argo/',local_root='./gdac',overwrite=False,verbose=True,checktime=True):
     """[summary]
 
     Args:
@@ -152,7 +154,7 @@ def download_profiles(df,gdac_root='https://www.usgodae.org/ftp/outgoing/argo/',
         localpath = Path(local_root,filepath)
         localpath.mkdir(parents= True, exist_ok= True)
         download_file(gdac_root+filepath,filename,
-                      save_to=str(localpath)+ '/',overwrite=overwrite,verbose=verbose)
+                      save_to=str(localpath)+ '/',overwrite=overwrite,verbose=verbose,checktime=checktime)
         downloaded_filenames.append(filename)
     return downloaded_filenames
 
@@ -171,7 +173,7 @@ def download_file(url_path,filename,save_to=None,overwrite=False,verbose=True,ch
                  or directory path
         overwrite: False to leave existing files in place
                    or True to overwrite existing files (neglected if checktime is true)
-        checktime: downloads only file at url_path is newer than file on disk
+        checktime: downloads file from url_path if they are newer than file on disk
                    (overwrite flag is neglected)
         verbose: True to announce progress
                  or False to stay silent
