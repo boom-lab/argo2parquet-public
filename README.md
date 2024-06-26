@@ -29,3 +29,9 @@ Python packages:
 
 ### Log
 * 2024.06.12: Argo2Parquet moved to its own repository
+
+### TODO
+This is a list of features that we think would be useful and we might implement some day (in no particular order):
+* incorporate creation of metadata file during conversion of profiles
+* parallelize files download in argo_tools
+  * updated conversion to use shallow copy when concataneting pandas dataframes
