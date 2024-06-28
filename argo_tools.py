@@ -15,7 +15,7 @@ from multiprocessing.pool import ThreadPool
 
 root = '.'
 # Function to download and parse GDAC synthetic profile index file
-def argo_gdac(gdac_path='./argo_synthetic-profile_index.txt',lat_range=None,lon_range=None,start_date=None,end_date=None,sensors=None,floats=None,overwrite_profiles=False,skip_downloads=True,download_individual_profs=False,save_to=None,verbose=True,dryrun=False,dac_url_root=None,checktime=True):
+def argo_gdac(gdac_path='./',lat_range=None,lon_range=None,start_date=None,end_date=None,sensors=None,floats=None,overwrite_profiles=False,skip_downloads=True,download_individual_profs=False,save_to=None,verbose=True,dryrun=False,dac_url_root=None,checktime=True):
     """Downloads GDAC Sprof index file, then selects float profiles based on criteria.
       Either returns information on profiles and floats (if skip_downloads=True) or downloads them (if False).
 
@@ -51,12 +51,13 @@ def argo_gdac(gdac_path='./argo_synthetic-profile_index.txt',lat_range=None,lon_
 
     """
 
-    if ~os.path.exists(gdac_path):
-        gdac_url  = 'https://usgodae.org/pub/outgoing/argo/dac/'
-        gdac_name = 'argo_synthetic-profile_index.txt'
-        download_file(gdac_url,gdac_name,save_to="./",overwrite=True,verbose=verbose,checktime=checktime)
-        
-    gdac_index = pd.read_csv(gdac_path,delimiter=',',header=8,parse_dates=['date','date_update'],
+    gdac_name = 'argo_synthetic-profile_index.txt'
+    if not os.path.exists(gdac_path + gdac_name):
+        gdac_url  = 'https://usgodae.org/pub/outgoing/argo/'
+        download_file(gdac_url,gdac_name,save_to=gdac_path,overwrite=True,verbose=verbose,checktime=checktime)
+
+    gdac_file = gdac_path+gdac_name
+    gdac_index = pd.read_csv(gdac_file,delimiter=',',header=8,parse_dates=['date','date_update'],
                              date_parser=lambda x: pd.to_datetime(x,format='%Y%m%d%H%M%S'))
 
 
