@@ -50,6 +50,12 @@ def argo_gdac(gdac_path='./argo_synthetic-profile_index.txt',lat_range=None,lon_
           dac_url_root: root directory to download/copy data from
 
     """
+
+    if ~os.path.exists(gdac_path):
+        gdac_url  = 'https://usgodae.org/pub/outgoing/argo/dac/'
+        gdac_name = 'argo_synthetic-profile_index.txt'
+        download_file(gdac_url,gdac_name,save_to="./",overwrite=True,verbose=verbose,checktime=checktime)
+        
     gdac_index = pd.read_csv(gdac_path,delimiter=',',header=8,parse_dates=['date','date_update'],
                              date_parser=lambda x: pd.to_datetime(x,format='%Y%m%d%H%M%S'))
 
@@ -237,4 +243,4 @@ def download_file(url_path,filename,save_to=None,overwrite=False,verbose=True,ch
         if verbose: print('>>> Successfully downloaded ' + filename + '.')
 
     except:
-        if verbose: print('>>> An error occurred while trying to download ' + filename + '.')
+        if verbose: print('>>> An error occurred while trying to download ' + filename + ' from ' + url_path + '.')
