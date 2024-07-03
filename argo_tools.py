@@ -11,11 +11,26 @@ import numpy as np
 import pandas as pd
 from scipy import interpolate
 import xarray as xr
-from multiprocessing.pool import ThreadPool
+import multiprocessing
+
+import sys
+import itertools
+from itertools import islice
+
+if sys.version_info >= (3, 12):
+    from itertools import batched
+else:
+    try:
+        from more_itertools import batched
+    except ImportError:
+        def batched(iterable, chunk_size):
+            iterator = iter(iterable)
+            while chunk := tuple(islice(iterator, chunk_size)):
+                yield chunk
 
 root = '.'
 # Function to download and parse GDAC synthetic profile index file
-def argo_gdac(gdac_path='./',lat_range=None,lon_range=None,start_date=None,end_date=None,sensors=None,floats=None,overwrite_profiles=False,skip_downloads=True,download_individual_profs=False,save_to=None,verbose=True,dryrun=False,dac_url_root=None,checktime=True):
+def argo_gdac(gdac_path='./',lat_range=None,lon_range=None,start_date=None,end_date=None,sensors=None,floats=None,overwrite_profiles=False,skip_downloads=True,download_individual_profs=False,save_to=None,verbose=True,dryrun=False,dac_url_root=None,checktime=True, NPROC=1):
     """Downloads GDAC Sprof index file, then selects float profiles based on criteria.
       Either returns information on profiles and floats (if skip_downloads=True) or downloads them (if False).
 
@@ -48,11 +63,13 @@ def argo_gdac(gdac_path='./',lat_range=None,lon_range=None,start_date=None,end_d
           checktime: download files from repository only if they are newer than files
                     on disk (overwrite flag is neglected if true)
           dac_url_root: root directory to download/copy data from
+          NPROC: number of processors to use to donwload argo files
 
     """
 
     gdac_name = 'argo_synthetic-profile_index.txt'
     if not os.path.exists(gdac_path + gdac_name):
+        print(gdac_name + ' not found in ' + gdac_path + '. Downloading it.')
         gdac_url  = 'https://usgodae.org/pub/outgoing/argo/'
         download_file(gdac_url,gdac_name,save_to=gdac_path,overwrite=True,verbose=verbose,checktime=checktime)
 
@@ -129,15 +146,48 @@ def argo_gdac(gdac_path='./',lat_range=None,lon_range=None,start_date=None,end_d
                                   filename,
                                   save_to=save_to,overwrite=overwrite_profiles,verbose=verbose,checktime=checktime)
         else:
+            urls = []
+            localpaths = []
+            local_fnames = []
+            downloaded_paths = []
             for f_idx, wmoid_filepath in enumerate(wmoid_filepaths):
-                downloaded_filenames.append(str(wmoids[f_idx]) + '_Sprof.nc')
-                if not dryrun: # it still returns the filename that would be downloaded
-                    download_file(dac_url_root + wmoid_filepath,str(wmoids[f_idx]) + '_Sprof.nc',
-                                  save_to=save_to,overwrite=overwrite_profiles,verbose=verbose,checktime=checktime)
+                filename = str(wmoids[f_idx]) + '_Sprof.nc'
+                downloaded_filenames.append( filename )
+                urls.append( dac_url_root + wmoid_filepath )
+                localpath = Path(save_to,wmoid_filepath)
+                localpath.mkdir(parents= True, exist_ok= True)
+                localpaths.append( localpath )
+                local_filename = str(localpath) + '/' + filename
+                local_fnames.append(local_filename)
+
+            if not dryrun: # it still returns the filename that would be downloaded
+
+                if NPROC == 1:
+                    for url_path, filename, localpath  in zip(urls, downloaded_filenames, localpaths):
+                        download_file(url_path,filename,save_to=str(localpath)+'/',
+                                      overwrite=overwrite_profiles,
+                                      verbose=verbose,checktime=checktime)
+
+                else:
+                    nb_to_download = len(downloaded_filenames)
+
+                    if NPROC > nb_to_download:
+                        NPROC = nb_to_download
+
+                    CHUNK_SZ = int(np.ceil(nb_to_download/NPROC))
+                    chunks_fname = batched(downloaded_filenames,CHUNK_SZ)
+                    chunks_url = batched(urls,CHUNK_SZ)
+                    chunks_saveto = batched(localpaths,CHUNK_SZ)
+                    args_download = [(chunk_url[0], chunk_fname[0], save_to[0], overwrite_profiles, verbose, checktime) for chunk_url, chunk_fname, chunk_saveto in zip(chunks_url, chunks_fname, chunks_saveto) ]
+                    pool_obj = multiprocessing.Pool(processes=NPROC)
+                    pool_obj.map( download_file_mp, args_download )
+                    pool_obj.close()
+                    pool_obj.join()
+
 
         if (not dryrun) and verbose: print("All requested files have been downloaded.")
 
-        return wmoids, gdac_index_subset, downloaded_filenames
+        return wmoids, gdac_index_subset, local_fnames
 
     else:
         return wmoids, gdac_index_subset
@@ -165,7 +215,29 @@ def download_profiles(df,gdac_root='https://www.usgodae.org/ftp/outgoing/argo/',
         downloaded_filenames.append(filename)
     return downloaded_filenames
 
+# Request url
+def get_func(url,stream=True):
+    try:
+        return requests.get(url,stream=stream,auth=None,verify=False)
+    except requests.exceptions.ConnectionError as error_tag:
+        print('Error connecting:',error_tag)
+        time.sleep(1)
+        return get_func(url,stream=stream)
 
+# Get url file modification time
+def get_time_url(url):
+    try:
+        r = requests.head(url)
+        url_time = r.headers['last-modified']
+        return parsedate(url_time)
+    except requests.exceptions.RequestException as e:
+        print("Request failed:", e)
+    except requests.exceptions.HTTPError as e:
+        print("HTTP error occurred:", e)
+        print("Status code:", response.status_code)
+        print("Response content:", response.text)
+    except Exception as e:
+        print("Other error occurred:", e)
 
 # Function to download a single file
 def download_file(url_path,filename,save_to=None,overwrite=False,verbose=True,checktime=True):
@@ -195,20 +267,6 @@ def download_file(url_path,filename,save_to=None,overwrite=False,verbose=True,ch
     if verbose: print('>>>> Destination file: ' + str(localfile) + '.')
     try:
 
-        def get_time_url(url):
-            try:
-                r = requests.head(url)
-                url_time = r.headers['last-modified']
-                return parsedate(url_time)
-            except requests.exceptions.RequestException as e:
-                print("Request failed:", e)
-            except requests.exceptions.HTTPError as e:
-                print("HTTP error occurred:", e)
-                print("Status code:", response.status_code)
-                print("Response content:", response.text)
-            except Exception as e:
-                print("Other error occurred:", e)
-
         if os.path.exists(localfile):
             if checktime:
                 current_file_time = datetime.fromtimestamp(os.path.getmtime(localfile))
@@ -216,7 +274,7 @@ def download_file(url_path,filename,save_to=None,overwrite=False,verbose=True,ch
                 tz = new_file_time.tzinfo
                 current_file_time = current_file_time.replace(tzinfo=tz).astimezone(tz)
                 if not new_file_time > current_file_time:
-                    if verbose: print('>>> File ' + filename + ' on disk newer than file at requested URL (' + str(url_path) + ') and is not downloaded.')
+                    if verbose: print('>>> File ' + filename + ' at requested URL (' + str(url_path) + ') is not newer than file on disk and is not downloaded.')
                     return
 
             elif not overwrite:
@@ -225,13 +283,66 @@ def download_file(url_path,filename,save_to=None,overwrite=False,verbose=True,ch
             else:
                 if verbose: print('>>> File ' + filename + ' already exists. Overwriting with new version.')
 
-        def get_func(url,stream=True):
-            try:
-                return requests.get(url,stream=stream,auth=None,verify=False)
-            except requests.exceptions.ConnectionError as error_tag:
-                print('Error connecting:',error_tag)
-                time.sleep(1)
-                return get_func(url,stream=stream)
+
+        response = get_func(url_path + filename,stream=True)
+
+        if response.status_code == 404:
+            if verbose: print('>>> File ' + filename + ' returned 404 error during download (requested URL: ' + str(url_path) + ').')
+            return
+        with open(save_to + filename,'wb') as out_file:
+            shutil.copyfileobj(response.raw,out_file)
+            del response
+        if verbose: print('>>> Successfully downloaded ' + filename + '.')
+
+    except:
+        if verbose: print('>>> An error occurred while trying to download ' + filename + ' from ' + url_path + '.')
+
+# Function to download a single file, in parallel
+def download_file_mp(args):
+
+    url_path,filename,save_to,overwrite,verbose,checktime = args
+
+    """Downloads and saves a file from a given URL using HTTP protocol.
+
+    Note: If '404 file not found' error returned, function will return without downloading anything.
+    
+    Arguments:
+        url_path: root URL to download from including trailing slash ('/')
+        filename: filename to download including suffix
+        save_to: None (to download to root Google Drive GO-BGC directory)
+                 or directory path
+        overwrite: False to leave existing files in place
+                   or True to overwrite existing files (neglected if checktime is true)
+        checktime: downloads file from url_path if they are newer than file on disk
+                   (overwrite flag is neglected)
+        verbose: True to announce progress
+                 or False to stay silent
+
+    """
+
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+    if save_to is None:
+        save_to = root
+    localfile = os.path.join(save_to,filename)
+    if verbose: print('>>>> Destination file: ' + str(localfile) + '.')
+    try:
+
+        if os.path.exists(localfile):
+            if checktime:
+                current_file_time = datetime.fromtimestamp(os.path.getmtime(localfile))
+                new_file_time = get_time_url(url_path + filename)
+                tz = new_file_time.tzinfo
+                current_file_time = current_file_time.replace(tzinfo=tz).astimezone(tz)
+                if not new_file_time > current_file_time:
+                    if verbose: print('>>> File ' + filename + ' at requested URL (' + str(url_path) + ') is not newer than file on disk and is not downloaded.')
+                    return
+
+            elif not overwrite:
+                if verbose: print('>>> File ' + filename + ' already exists. Leaving current version.')
+                return
+            else:
+                if verbose: print('>>> File ' + filename + ' already exists. Overwriting with new version.')
 
         response = get_func(url_path + filename,stream=True)
 

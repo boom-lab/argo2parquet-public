@@ -29,9 +29,14 @@ Python packages:
 
 ### Log
 * 2024.06.12: Argo2Parquet moved to its own repository
+* 2024.07.03: metadata are converted to parquet, argo files can be downloaded in parallel, various tests
 
 ### TODO
 This is a list of features that we think would be useful and we might implement some day (in no particular order):
-* incorporate creation of metadata file during conversion of profiles
-* parallelize files download in argo_tools
-  * updated conversion to use shallow copy when concataneting pandas dataframes
+* add print to external log file for errors during download from Argo servers
+* add print to external log file for errors during conversion
+* return separate lists of downloaded files and failed downloads
+* update download to `imap_unordered`
+* ~incorporate creation of metadata file during conversion of profiles~
+* ~parallelize files download in argo_tools~
+* update conversion to use shallow copy when concataneting pandas dataframes
