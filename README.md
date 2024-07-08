@@ -27,10 +27,10 @@ For AWS examples:
 * boto3 1.34.140
 
 ### Running the code
-Go through the Examples 1 and 2.
+Go through the Examples 1, 2, and 3.
 
 ### Log
-* 2024.07.08: added access to AWS S3, examples 1 and 2
+* 2024.07.08: added access to AWS S3, examples 1, 2, 3
 * 2024.07.03: metadata are converted to parquet, argo files can be downloaded in parallel, various tests
 * 2024.06.12: Argo2Parquet moved to its own repository
 
