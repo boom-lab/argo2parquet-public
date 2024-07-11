@@ -13,6 +13,7 @@ NB: the development is ongoing and in its infant stage, more complete documentat
 ### Requirements
 * Python 3.9.10
 
+##### Both Poseidon and AWS S3 examples
 Python packages:
 * argopy 0.1.15
 * gsw 3.6.18
@@ -23,8 +24,11 @@ Python packages:
 * cartopy 0.23.0
 * matplotlib 3.9.0
 
-For AWS examples:
-* boto3 1.34.140
+##### For AWS examples
+You will need to install also `boto3 (1.34.140)`. At this time the bucket with the data for the examples is public, so there is no need to set up your AWS S3 credentials. This might change in the future.
+
+##### For Poseidon examples
+You will need access to Boom's lab shared storage on Poseidon, and connection through WHOI's network (i.e. VPN or on-site Eduroam).
 
 ### Running the code
 Go through the Examples 1, 2, and 3.
