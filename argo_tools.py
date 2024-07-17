@@ -30,7 +30,7 @@ else:
 
 root = '.'
 # Function to download and parse GDAC synthetic profile index file
-def argo_gdac(gdac_path='./',lat_range=None,lon_range=None,start_date=None,end_date=None,sensors=None,floats=None,overwrite_profiles=False,skip_downloads=True,download_individual_profs=False,save_to=None,verbose=True,dryrun=False,dac_url_root=None,checktime=True, NPROC=1):
+def argo_gdac(gdac_path='./', dataset="bgc", lat_range=None,lon_range=None,start_date=None,end_date=None,sensors=None,floats=None,overwrite_profiles=False,skip_downloads=True,download_individual_profs=False,save_to=None,verbose=True,dryrun=False,dac_url_root=None,checktime=True, NPROC=1):
     """Downloads GDAC Sprof index file, then selects float profiles based on criteria.
       Either returns information on profiles and floats (if skip_downloads=True) or downloads them (if False).
 
@@ -67,19 +67,23 @@ def argo_gdac(gdac_path='./',lat_range=None,lon_range=None,start_date=None,end_d
 
     """
 
-    gdac_name = 'argo_synthetic-profile_index.txt'
+    if dataset=="bgc":
+        gdac_name = 'argo_synthetic-profile_index.txt'
+    elif dataset=="phy":
+        gdac_name = 'ar_index_global_prof.txt'
+    else:
+        raise ValueError('Dataset variable must be set to bgc or phy.')
+
     if not os.path.exists(gdac_path + gdac_name):
         print(gdac_name + ' not found in ' + gdac_path + '. Downloading it.')
         gdac_url  = 'https://usgodae.org/pub/outgoing/argo/'
         download_file(gdac_url,gdac_name,save_to=gdac_path,overwrite=True,verbose=verbose,checktime=checktime)
 
+
+  # Load index file into Pandas DataFrame
     gdac_file = gdac_path+gdac_name
     gdac_index = pd.read_csv(gdac_file,delimiter=',',header=8,parse_dates=['date','date_update'],
                              date_parser=lambda x: pd.to_datetime(x,format='%Y%m%d%H%M%S'))
-
-
-  # Load index file into Pandas DataFrame
-  
 
   # Establish time and space criteria
     if lat_range is None:  lat_range = [-90.0,90.0]
@@ -90,6 +94,8 @@ def argo_gdac(gdac_path='./',lat_range=None,lon_range=None,start_date=None,end_d
     if start_date is None: start_date = datetime(1900,1,1)
     if end_date is None:   end_date = datetime(2200,1,1)
 
+    # file name convention
+    # [institution ('aoml', 'coriolis', etc)] / [wmo_id] / profiles / [real time ('R') or delayed ('D') mode + wmo_id + cycle number + eventual descending profile ('D')] + .nc
     float_wmoid_regexp = r'[a-z]*/[0-9]*/profiles/[A-Z]*([0-9]*)_[0-9]*[A-Z]*.nc'
     gdac_index['wmoid'] = gdac_index['file'].str.extract(float_wmoid_regexp).astype(int)
     filepath_main_regexp = '([a-z]*/[0-9]*/)profiles/[A-Z]*[0-9]*_[0-9]*[A-Z]*.nc'
@@ -120,6 +126,7 @@ def argo_gdac(gdac_path='./',lat_range=None,lon_range=None,start_date=None,end_d
 
     # If requested, subset profiles using sensor criteria
     if sensors is not None:
+        if not dataset=='bgc': ValueError('sensors can only be used with bgc dataset')
         if type(sensors) is not list: sensors = [sensors]
         for sensor in sensors:
             gdac_index_subset = gdac_index_subset.loc[gdac_index_subset['parameters'].str.contains(sensor),:]
@@ -150,8 +157,13 @@ def argo_gdac(gdac_path='./',lat_range=None,lon_range=None,start_date=None,end_d
             localpaths = []
             local_fnames = []
             downloaded_paths = []
+            if dataset=='bgc':
+                prof_ext = '_Sprof.nc'
+            elif dataset=='phy':
+                prof_ext = '_prof.nc'
+                
             for f_idx, wmoid_filepath in enumerate(wmoid_filepaths):
-                filename = str(wmoids[f_idx]) + '_Sprof.nc'
+                filename = str(wmoids[f_idx]) + prof_ext
                 downloaded_filenames.append( filename )
                 urls.append( dac_url_root + wmoid_filepath )
                 localpath = Path(save_to,wmoid_filepath)
@@ -171,8 +183,12 @@ def argo_gdac(gdac_path='./',lat_range=None,lon_range=None,start_date=None,end_d
                 else:
                     nb_to_download = len(downloaded_filenames)
 
+                    if NPROC > 100:
+                        print('Limiting to 100 processors.')
+                        NPROC = 100
                     if NPROC > nb_to_download:
                         NPROC = nb_to_download
+                        print('More processors than files requested, limiting NPROC to number of files.')
 
                     CHUNK_SZ = int(np.ceil(nb_to_download/NPROC))
                     chunks_fname = batched(downloaded_filenames,CHUNK_SZ)
@@ -289,9 +305,10 @@ def download_file(url_path,filename,save_to=None,overwrite=False,verbose=True,ch
         if response.status_code == 404:
             if verbose: print('>>> File ' + filename + ' returned 404 error during download (requested URL: ' + str(url_path) + ').')
             return
-        with open(save_to + filename,'wb') as out_file:
+        with open(save_to+filename,'wb') as out_file:
             shutil.copyfileobj(response.raw,out_file)
             del response
+
         if verbose: print('>>> Successfully downloaded ' + filename + '.')
 
     except:
@@ -349,7 +366,7 @@ def download_file_mp(args):
         if response.status_code == 404:
             if verbose: print('>>> File ' + filename + ' returned 404 error during download (requested URL: ' + str(url_path) + ').')
             return
-        with open(save_to + filename,'wb') as out_file:
+        with open(localfile,'wb') as out_file:
             shutil.copyfileobj(response.raw,out_file)
             del response
         if verbose: print('>>> Successfully downloaded ' + filename + '.')
