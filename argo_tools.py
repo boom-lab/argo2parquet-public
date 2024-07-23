@@ -149,9 +149,8 @@ def argo_gdac(gdac_path='./', dataset="bgc", lat_range=None,lon_range=None,start
                     filepath = os.path.join('dac',gdac_index_subset.loc[p_idx]['filepath'])
                     localpath = Path('./gdac',filepath)
                     localpath.mkdir(parents= True, exist_ok= True)
-                    download_file(dac_url_root + gdac_index_subset.loc[p_idx]['filepath'],
-                                  filename,
-                                  save_to=save_to,overwrite=overwrite_profiles,verbose=verbose,checktime=checktime)
+                    args = (dac_url_root + gdac_index_subset.loc[p_idx]['filepath'], filename, save_to, overwrite_profiles, verbose, checktime, None)
+                    download_file(args)
         else:
             urls = []
             localpaths = []
@@ -164,21 +163,26 @@ def argo_gdac(gdac_path='./', dataset="bgc", lat_range=None,lon_range=None,start
                 
             for f_idx, wmoid_filepath in enumerate(wmoid_filepaths):
                 filename = str(wmoids[f_idx]) + prof_ext
-                downloaded_filenames.append( filename )
-                urls.append( dac_url_root + wmoid_filepath )
                 localpath = Path(save_to,wmoid_filepath)
                 localpath.mkdir(parents= True, exist_ok= True)
+                localpath = str(localpath) + '/'
+                local_filename = localpath + filename
+                if checktime:
+                    if more_recent(local_filename, wmoids[f_idx], gdac_index_subset):
+                        if verbose:
+                            #print('No profile newer than those already on disk found for WMOID ' + str(wmoids[f_idx]) )
+                            continue
+                downloaded_filenames.append( filename )
+                urls.append( dac_url_root + wmoid_filepath )
                 localpaths.append( localpath )
-                local_filename = str(localpath) + '/' + filename
                 local_fnames.append(local_filename)
 
             if not dryrun: # it still returns the filename that would be downloaded
 
                 if NPROC == 1:
                     for url_path, filename, localpath  in zip(urls, downloaded_filenames, localpaths):
-                        download_file(url_path,filename,save_to=str(localpath)+'/',
-                                      overwrite=overwrite_profiles,
-                                      verbose=verbose,checktime=checktime)
+                        args = (url_path,filename,localpath,overwrite_profiles,verbose,checktime,None)
+                        download_file(args)
 
                 else:
                     nb_to_download = len(downloaded_filenames)
@@ -190,13 +194,18 @@ def argo_gdac(gdac_path='./', dataset="bgc", lat_range=None,lon_range=None,start
                         NPROC = nb_to_download
                         print('More processors than files requested, limiting NPROC to number of files.')
 
+
+                    print('nb_to_download: ' + str(nb_to_download) )
+
                     CHUNK_SZ = int(np.ceil(nb_to_download/NPROC))
-                    chunks_fname = batched(downloaded_filenames,CHUNK_SZ)
-                    chunks_url = batched(urls,CHUNK_SZ)
-                    chunks_saveto = batched(localpaths,CHUNK_SZ)
-                    args_download = [(chunk_url[0], chunk_fname[0], save_to[0], overwrite_profiles, verbose, checktime) for chunk_url, chunk_fname, chunk_saveto in zip(chunks_url, chunks_fname, chunks_saveto) ]
+                    chunks_fname = list(batched(downloaded_filenames,CHUNK_SZ))
+                    chunks_url = list(batched(urls,CHUNK_SZ))
+                    chunks_saveto = list(batched(localpaths,CHUNK_SZ))
+
+                    args_download = [ (rank, overwrite_profiles, verbose, checktime, chunk_url, chunk_fname, chunk_saveto) for rank, (chunk_url, chunk_fname, chunk_saveto) in enumerate(zip(chunks_url, chunks_fname, chunks_saveto)) ]
+
                     pool_obj = multiprocessing.Pool(processes=NPROC)
-                    pool_obj.map( download_file_mp, args_download )
+                    pool_obj.starmap(download_file_mp, args_download)
                     pool_obj.close()
                     pool_obj.join()
 
@@ -256,11 +265,93 @@ def get_time_url(url):
         print("Other error occurred:", e)
 
 # Function to download a single file
-def download_file(url_path,filename,save_to=None,overwrite=False,verbose=True,checktime=True):
+# def download_file(url_path,filename,save_to,overwrite,verbose,checktime):
+
+#     """Downloads and saves a file from a given URL using HTTP protocol.
+
+#     Note: If '404 file not found' error returned, function will return without downloading anything.
+
+#     Arguments:
+#         url_path: root URL to download from including trailing slash ('/')
+#         filename: filename to download including suffix
+#         save_to: None (to download to root Google Drive GO-BGC directory)
+#                  or directory path
+#         overwrite: False to leave existing files in place
+#                    or True to overwrite existing files (neglected if checktime is true)
+#         checktime: downloads file from url_path if they are newer than file on disk
+#                    (overwrite flag is neglected)
+#         verbose: True to announce progress
+#                  or False to stay silent
+
+#     """
+
+#     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+#     if save_to is None:
+#         save_to = root
+#     localfile = os.path.join(save_to,filename)
+#     if verbose: print('>>>> Destination file: ' + str(localfile) + '.')
+#     try:
+
+#         if os.path.exists(localfile):
+#             if checktime:
+#                 current_file_time = datetime.fromtimestamp(os.path.getmtime(localfile))
+#                 new_file_time = get_time_url(url_path + filename)
+#                 tz = new_file_time.tzinfo
+#                 current_file_time = current_file_time.replace(tzinfo=tz).astimezone(tz)
+#                 if not new_file_time > current_file_time:
+#                     if verbose: print('>>> File ' + filename + ' at requested URL (' + str(url_path) + ') is not newer than file on disk and is not downloaded.')
+#                     return
+
+#             elif not overwrite:
+#                 if verbose: print('>>> File ' + filename + ' already exists. Leaving current version.')
+#                 return
+#             else:
+#                 if verbose: print('>>> File ' + filename + ' already exists. Overwriting with new version.')
+
+
+#         response = get_func(url_path + filename,stream=True)
+
+#         if response.status_code == 404:
+#             if verbose: print('>>> File ' + filename + ' returned 404 error during download (requested URL: ' + str(url_path) + ').')
+#             return
+#         with open(save_to+filename,'wb') as out_file:
+#             shutil.copyfileobj(response.raw,out_file)
+#             del response
+
+#         if verbose: print('>>> Successfully downloaded ' + filename + '.')
+
+#     except:
+#         if verbose: print('>>> An error occurred while trying to download ' + filename + ' from ' + url_path + '.')
+
+# Function to loop downloads for parallel batches
+def download_file_mp( rank, overwrite_profiles, verbose, checktime, chunk_url, chunk_fname, chunk_saveto):
+
+    if rank is not None:
+        rank_str = "#" + str(rank) + ": "
+    else:
+        rank_str = ''
+
+    nb_downloads = len(chunk_fname)
+    for f_idx, (url_path, filename, save_to) in enumerate(zip(chunk_url,chunk_fname,chunk_saveto)):
+        print(rank_str + '>>> (' + str(round(f_idx*100/nb_downloads)) + '%) File ' + str(f_idx) + ' of ' + str(nb_downloads) + '...')
+        args = [url_path, filename, save_to, overwrite_profiles, verbose, checktime, rank]
+        download_file(args)
+
+
+# Function to download a single file
+def download_file(args):
+
+    url_path,filename,save_to,overwrite,verbose,checktime,rank = args
+
+    if rank is not None:
+        rank_str = "#" + str(rank) + ": "
+    else:
+        rank_str = ''
     """Downloads and saves a file from a given URL using HTTP protocol.
 
     Note: If '404 file not found' error returned, function will return without downloading anything.
-    
+
     Arguments:
         url_path: root URL to download from including trailing slash ('/')
         filename: filename to download including suffix
@@ -280,7 +371,7 @@ def download_file(url_path,filename,save_to=None,overwrite=False,verbose=True,ch
     if save_to is None:
         save_to = root
     localfile = os.path.join(save_to,filename)
-    if verbose: print('>>>> Destination file: ' + str(localfile) + '.')
+    if verbose: print(rank_str + '>>>> Destination file: ' + str(localfile) + '.')
     try:
 
         if os.path.exists(localfile):
@@ -290,86 +381,40 @@ def download_file(url_path,filename,save_to=None,overwrite=False,verbose=True,ch
                 tz = new_file_time.tzinfo
                 current_file_time = current_file_time.replace(tzinfo=tz).astimezone(tz)
                 if not new_file_time > current_file_time:
-                    if verbose: print('>>> File ' + filename + ' at requested URL (' + str(url_path) + ') is not newer than file on disk and is not downloaded.')
+                    if verbose: print(rank_str + '>>> File ' + filename + ' at requested URL (' + str(url_path) + ') is not newer than file on disk and is not downloaded.')
                     return
 
             elif not overwrite:
-                if verbose: print('>>> File ' + filename + ' already exists. Leaving current version.')
+                if verbose: print(rank_str + '>>> File ' + filename + ' already exists. Leaving current version.')
                 return
             else:
-                if verbose: print('>>> File ' + filename + ' already exists. Overwriting with new version.')
+                if verbose: print(rank_str + '>>> File ' + filename + ' already exists. Overwriting with new version.')
 
-
-        response = get_func(url_path + filename,stream=True)
+        url_dl = url_path + filename
+        response = get_func(url_dl,stream=True)
 
         if response.status_code == 404:
-            if verbose: print('>>> File ' + filename + ' returned 404 error during download (requested URL: ' + str(url_path) + ').')
+            if verbose: print(rank_str + '>>> File ' + filename + ' returned 404 error during download (requested URL: ' + str(url_dl) + ').')
             return
+
         with open(save_to+filename,'wb') as out_file:
             shutil.copyfileobj(response.raw,out_file)
             del response
-
-        if verbose: print('>>> Successfully downloaded ' + filename + '.')
+        if verbose: print(rank_str + '>>> Successfully downloaded ' + filename + '.')
 
     except:
-        if verbose: print('>>> An error occurred while trying to download ' + filename + ' from ' + url_path + '.')
+        if verbose: print(rank_str + '>>> An error occurred while trying to download ' + filename + ' from ' + url_path + '.')
 
-# Function to download a single file, in parallel
-def download_file_mp(args):
+# Return true if current profile collection on disk is more recent than all
+# single profiles in index file (for given wmoid)
+def more_recent(local_filename, wmoid, gdac_index_subset):
+    if os.path.exists(local_filename):
 
-    url_path,filename,save_to,overwrite,verbose,checktime = args
-
-    """Downloads and saves a file from a given URL using HTTP protocol.
-
-    Note: If '404 file not found' error returned, function will return without downloading anything.
-    
-    Arguments:
-        url_path: root URL to download from including trailing slash ('/')
-        filename: filename to download including suffix
-        save_to: None (to download to root Google Drive GO-BGC directory)
-                 or directory path
-        overwrite: False to leave existing files in place
-                   or True to overwrite existing files (neglected if checktime is true)
-        checktime: downloads file from url_path if they are newer than file on disk
-                   (overwrite flag is neglected)
-        verbose: True to announce progress
-                 or False to stay silent
-
-    """
-
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-    if save_to is None:
-        save_to = root
-    localfile = os.path.join(save_to,filename)
-    if verbose: print('>>>> Destination file: ' + str(localfile) + '.')
-    try:
-
-        if os.path.exists(localfile):
-            if checktime:
-                current_file_time = datetime.fromtimestamp(os.path.getmtime(localfile))
-                new_file_time = get_time_url(url_path + filename)
-                tz = new_file_time.tzinfo
-                current_file_time = current_file_time.replace(tzinfo=tz).astimezone(tz)
-                if not new_file_time > current_file_time:
-                    if verbose: print('>>> File ' + filename + ' at requested URL (' + str(url_path) + ') is not newer than file on disk and is not downloaded.')
-                    return
-
-            elif not overwrite:
-                if verbose: print('>>> File ' + filename + ' already exists. Leaving current version.')
-                return
-            else:
-                if verbose: print('>>> File ' + filename + ' already exists. Overwriting with new version.')
-
-        response = get_func(url_path + filename,stream=True)
-
-        if response.status_code == 404:
-            if verbose: print('>>> File ' + filename + ' returned 404 error during download (requested URL: ' + str(url_path) + ').')
+        try:
+            current_file_time = datetime.fromtimestamp(os.path.getmtime(local_filename))
+        except:
+            # if date format is not correct, we will download the file anyways
             return
-        with open(localfile,'wb') as out_file:
-            shutil.copyfileobj(response.raw,out_file)
-            del response
-        if verbose: print('>>> Successfully downloaded ' + filename + '.')
 
-    except:
-        if verbose: print('>>> An error occurred while trying to download ' + filename + ' from ' + url_path + '.')
+        ref_times = gdac_index_subset.loc[ gdac_index_subset['wmoid'] == wmoid, 'date_update']
+        return all( date < current_file_time for date in ref_times )

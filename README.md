@@ -34,12 +34,14 @@ You will need access to Boom's lab shared storage on Poseidon, and connection th
 Go through the Examples 1, 2, and 3.
 
 ### Log
+* 2024.07.23: added Argo-phy download, time checking through index files
 * 2024.07.08: added access to AWS S3, examples 1, 2, 3
 * 2024.07.03: metadata are converted to parquet, argo files can be downloaded in parallel, various tests
 * 2024.06.12: Argo2Parquet moved to its own repository
 
 ### TODO
 This is a list of features that we think would be useful and we might implement some day (in no particular order):
+* 
 * add print to external log file for errors during download from Argo servers
 * add print to external log file for errors during conversion
 * return separate lists of downloaded files and failed downloads
