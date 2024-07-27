@@ -43,7 +43,7 @@ class cloudTools():
 
         self.cluster = coiled.Cluster(
             name="read-parquet-demo",
-            n_workers=1,  # simple test on a 20~MB file, no need for parallel per se
+            n_workers=[4, 20], # adaptively scales between 4 and 20 workers
             region="us-east-1",  # Start workers in same region as data to minimize costs
             compute_purchase_option="spot_with_fallback", # spot instances (cheaper), if none available: fall back to normal on-demand
             use_best_zone = True, # pick best availability zone within specified region (should reduce costs)
@@ -71,9 +71,10 @@ class cloudTools():
         if filters is None:
             filters = []
 
+        #   "s3://argo-experimental/pqt/data/ArgoPHY0357.parquet", # 20 MB file
         ## importing data into Dask dataframe
         ddf = dd.read_parquet(
-            "s3://argo-experimental/pqt/data/ArgoPHY0357.parquet", # 20 MB file
+            "s3://argo-experimental/pqt/data/ArgoPHY/",
             engine="pyarrow",
             storage_options={"anon": True, "use_ssl": True},
             columns = cols,
