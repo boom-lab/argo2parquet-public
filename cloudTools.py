@@ -10,6 +10,7 @@
 ##########################################################################
 import coiled
 import dask.dataframe as dd
+import pyarrow.parquet as pq
 ##########################################################################
 
 class cloudTools():
@@ -60,7 +61,7 @@ class cloudTools():
 
 #------------------------------------------------------------------------------#
 ## Import data into Dask Dataframe and load them into virtual memory
-    def load_data(self,cols=None,filters=None):
+    def load_data(self,cols=None,filters=None,use_dask=True):
 
         # validating input
         if cols is None:
@@ -73,25 +74,37 @@ class cloudTools():
 
         #   "s3://argo-experimental/pqt/data/ArgoPHY0357.parquet", # 20 MB file
         ## importing data into Dask dataframe
-        ddf = dd.read_parquet(
-            "s3://argo-experimental/pqt/data/ArgoPHY/",
-            engine="pyarrow",
-            storage_options={"anon": True, "use_ssl": True},
-            columns = cols,
-            filters = filters
-        )
+        dir_ArgoPHY = "s3://argo-experimental/pqt/data/ArgoPHY/"
+        if use_dask:
+            ddf = dd.read_parquet(
+                dir_ArgoPHY,
+                engine="pyarrow",
+                storage_options={"anon": True, "use_ssl": True},
+                columns = cols,
+                filters = filters
+            )
 
-        ## computing memory usage of a dask dataframe partition
-        def partition_memory_usage(ddf_partition):
-            return ddf_partition.memory_usage(deep=True).sum()
+            ## computing memory usage of a dask dataframe partition
+            def partition_memory_usage(ddf_partition):
+                return ddf_partition.memory_usage(deep=True).sum()
 
-        ## estimating dataframe size
-        ddf_size = ddf.map_partitions(partition_memory_usage).compute().sum() / (1024**3) #GB
+            ## estimating dataframe size
+            ddf_size = ddf.map_partitions(partition_memory_usage).compute().sum() / (1024**3) #GB
 
-        if ddf_size > 10:
-            raise("Safeguard: Dataset too large for current implementation (>10 GB). Interrupting execution.")
+            if ddf_size > 10:
+                raise("Safeguard: Dataset too large for current implementation (>10 GB). Interrupting execution.")
+            else:
+                self.data_frame = ddf.persist()
+
         else:
-            self.data_frame = ddf.persist()
+            PHY_schema = pq.read_schema("s3://argo-experimental/pqt/data/metadata/ArgoPHY_schema.metadata")
+            ds = pq.ParquetDataset(
+                dir_ArgoPHY,
+                schema=PHY_schema,
+                filters=filters
+            )
+            self.data_frame = ds.read(columns=cols).to_pandas()
+
 
 ##########################################################################
 
