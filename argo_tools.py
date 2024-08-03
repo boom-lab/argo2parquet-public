@@ -155,6 +155,7 @@ def argo_gdac(gdac_path='./', dataset="bgc", lat_range=None,lon_range=None,start
             urls = []
             localpaths = []
             local_fnames = []
+            all_local_fnames = []
             downloaded_paths = []
             if dataset=='bgc':
                 prof_ext = '_Sprof.nc'
@@ -167,6 +168,7 @@ def argo_gdac(gdac_path='./', dataset="bgc", lat_range=None,lon_range=None,start
                 localpath.mkdir(parents= True, exist_ok= True)
                 localpath = str(localpath) + '/'
                 local_filename = localpath + filename
+                all_local_fnames.append(local_filename)
                 if checktime:
                     if more_recent(local_filename, wmoids[f_idx], gdac_index_subset):
                         if verbose:
@@ -212,7 +214,7 @@ def argo_gdac(gdac_path='./', dataset="bgc", lat_range=None,lon_range=None,start
 
         if (not dryrun) and verbose: print("All requested files have been downloaded.")
 
-        return wmoids, gdac_index_subset, local_fnames
+        return wmoids, gdac_index_subset, all_local_fnames
 
     else:
         return wmoids, gdac_index_subset
