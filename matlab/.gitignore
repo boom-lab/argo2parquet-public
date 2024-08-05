@@ -1,0 +1,6 @@
+# Ignore database subfolder and temporary matlab files
+*database*
+*.asv
+
+# This file forces git to keep the empty folder in the repository. The folder
+# itself is needed for the analyses' output.

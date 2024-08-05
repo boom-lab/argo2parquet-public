@@ -7,8 +7,9 @@ NB: the development is ongoing and in its infant stage, more complete documentat
 ### Table of Contents
 1. [Requirements](#requirements)
 2. [Running the code](#running-the-code)
-3. [Log](#log)
-4. [TODO](#TODO)
+3. [MATLAB access](#matlab-access)
+4. [Log](#log)
+5. [TODO](#TODO)
 
 ### Requirements
 * Python 3.9.10
@@ -33,7 +34,16 @@ You will need access to Boom's lab shared storage on Poseidon, and connection th
 ### Running the code
 Go through the Examples 1, 2, and 3.
 
+### MATLAB access
+The folder `matlab` contains an example to access the Argo Core and BGC parquet databases with MATLAB. 
+
+The most recent version of MATLAB is recommended, as the tools to access parquet databases are fairly recent and keeps being updated. The code has been tested on MATLAB R2024a. Versions R2022a and more recent might be compatible, while older ones should not.
+
+Note that the databases needs to be provided separately at the moment. [Reach out](enrico.milanese@whoi.edu) for a link to download them.
+
 ### Log
+* 2024.08.05: added filtering tools for MATLAB
+* 2024.08.03: conversion and read now doable with Dask; speed tests added
 * 2024.07.23: added Argo-phy download, time checking through index files
 * 2024.07.08: added access to AWS S3, examples 1, 2, 3
 * 2024.07.03: metadata are converted to parquet, argo files can be downloaded in parallel, various tests
