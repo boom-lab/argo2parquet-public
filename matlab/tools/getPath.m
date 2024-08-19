@@ -1,22 +1,31 @@
-function [path, lPlanner] = getPath(refPoint, floatPoint, boxSW, boxNE)
+function [localPath, localPlanner, occupancyWarning] = getPath(refPoint, floatPoint, boxSW, boxNE)
 
-    wom = load('./worldOccupancyMap_p1e2_r010.mat');
+    womPath1 = fullfile('.','worldOccupancyMap_p1e2_r010.mat');
+    womPath2 = fullfile('.','tools','worldOccupancyMap_p1e2_r010.mat');
+
+    if isfile(womPath1)
+        wom = load(womPath1);
+    elseif isfile(womPath2)
+        wom = load(womPath2);
+    else
+        error('Path to world occupancy map not properly set.')
+    end
     
-    globalMap = occupancyMap(wom.grid);
-    wPlanner = plannerAStarGrid(globalMap);
+    % globalMap = occupancyMap(wom.grid);
+    % wPlanner = plannerAStarGrid(globalMap);
     
     worldWidth = 360;
-    worldHeight = 180;
+    % worldHeight = 180;
     mapWidth = length(wom.grid(1,:));
     mapHeight = length(wom.grid(:,1));
     resolution = worldWidth/mapWidth;
     
-    [globalStartCol, globalStartRow] = latlon2grid( refPoint, 'point', [-90,-180], resolution, mapHeight);
-    [globalEndCol, globalEndRow] = latlon2grid( floatPoint, 'point', [-90,-180], resolution, mapHeight);
-    path = wPlanner.plan( ...
-        [globalStartRow, globalStartCol], ...
-        [globalEndRow, globalEndCol] ...
-        );
+    % [globalStartCol, globalStartRow] = latlon2grid( refPoint, 'point', [-90,-180], resolution, mapHeight);
+    % [globalEndCol, globalEndRow] = latlon2grid( floatPoint, 'point', [-90,-180], resolution, mapHeight);
+    % path = wPlanner.plan( ...
+    %     [globalStartRow, globalStartCol], ...
+    %     [globalEndRow, globalEndCol] ...
+    %     );
     
     boxHeight = boxNE(1) - boxSW(1);
     boxWidth = boxNE(2) - boxSW(2);
@@ -32,13 +41,26 @@ function [path, lPlanner] = getPath(refPoint, floatPoint, boxSW, boxNE)
         gridCol:(gridCol+gridWidth) ...
         ) ...
         );
-    lPlanner = plannerAStarGrid(localMap);
+    localPlanner = plannerAStarGrid(localMap);
     [localStartCol, localStartRow] = latlon2grid( refPoint, 'point', boxSW, resolution, gridHeight);
     [localEndCol, localEndRow]     = latlon2grid( floatPoint, 'point', boxSW, resolution, gridHeight);
-    localPath = lPlanner.plan( ...
-        [localStartRow, localStartCol],...
-        [localEndRow, localEndCol]...
-        );
+
+    % checking if float is in a free site in the occupancy map
+    % occupancyWarning = checkOccupancy(localMap, flip(floatPoint));
+    % if occupancyWarning < 1
+    try
+        localPath = localPlanner.plan( ...
+            [localStartRow, localStartCol],...
+            [localEndRow, localEndCol]...
+            );
+        occupancyWarning = false;
+    catch ME
+        localPath = [];
+        occupancyWarning =true;
+    end
+
+    % adjust path by discretisation
+    localPath = localPath * resolution;
 
 end
 

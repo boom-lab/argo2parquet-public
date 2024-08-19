@@ -7,6 +7,7 @@ function indices = outsidePolygon(table, polygon)
         polygon(:,2) ...
         ); 
 
+    % numerical index for each row currently present
     indices = linspace(1,height(table),height(table));
 
     if length(inPolygon) ~= length(indices)
