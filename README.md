@@ -1,6 +1,6 @@
 ## Argo2Parquet
 
-Argo2Parquet is a python script to bulk convert Argo data from the Global Data Assembly Centers (GDAC) from their original [NetCDF](https://www.unidata.ucar.edu/software/netcdf/) format to the [parquet](https://parquet.apache.org/) format.
+Argo2Parquet is a suite of python scripts and notebooks to bulk-convert Argo data from the Global Data Assembly Centers (GDAC) from their original [NetCDF](https://www.unidata.ucar.edu/software/netcdf/) format to the [parquet](https://parquet.apache.org/) format.
 
 NB: the development is ongoing and in its infant stage, more complete documentation will be added as developing and testing proceed.
 
@@ -14,7 +14,7 @@ NB: the development is ongoing and in its infant stage, more complete documentat
 ### Requirements
 * Python 3.9.10
 
-##### Both Poseidon and AWS S3 examples
+##### Both cluster/Poseidon and AWS S3 examples
 Python packages:
 * argopy 0.1.15
 * gsw 3.6.18
@@ -25,11 +25,13 @@ Python packages:
 * cartopy 0.23.0
 * matplotlib 3.9.0
 
+##### For cluster/Poseidon examples
+Examples with 'Poseidon' or 'cluster' in their name store or access data in WHOI's server. You should be able to easily adapt these examples for your own server or local machine by changing the paths accordingly, as the code itself does not require any credentials (the notebooks are meant to run directly on the server).
+
+If you want to exectue them on Poseidon, you will need access to both WHOI's network (i.e. VPN or on-site Eduroam) and Boom's lab shared storage on the server.
+
 ##### For AWS examples
 You will need to install also `boto3 (1.34.140)`. At this time the bucket with the data for the examples is public, so there is no need to set up your AWS S3 credentials. This might change in the future.
-
-##### For Poseidon examples
-You will need access to Boom's lab shared storage on Poseidon, and connection through WHOI's network (i.e. VPN or on-site Eduroam).
 
 ### Running the code
 Go through the Examples 1, 2, and 3.
@@ -44,6 +46,7 @@ Note that the databases needs to be provided separately at the moment. [Reach ou
 ### Log
 * 2024.08.05: added filtering tools for MATLAB
 * 2024.08.03: conversion and read now doable with Dask; speed tests added
+* 2024.07.30: coiled-AWS example added for self-managing aws access
 * 2024.07.23: added Argo-phy download, time checking through index files
 * 2024.07.08: added access to AWS S3, examples 1, 2, 3
 * 2024.07.03: metadata are converted to parquet, argo files can be downloaded in parallel, various tests
@@ -51,7 +54,9 @@ Note that the databases needs to be provided separately at the moment. [Reach ou
 
 ### TODO
 This is a list of features that we think would be useful and we might implement some day (in no particular order):
-* 
+
+* ~add parquet schemas to this repo~
+* switch all paths to `pathlib`
 * add print to external log file for errors during download from Argo servers
 * add print to external log file for errors during conversion
 * return separate lists of downloaded files and failed downloads
