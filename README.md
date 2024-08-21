@@ -34,7 +34,7 @@ If you want to exectue them on Poseidon, you will need access to both WHOI's net
 You will need to install also `boto3 (1.34.140)`. At this time the bucket with the data for the examples is public, so there is no need to set up your AWS S3 credentials. This might change in the future.
 
 ### Running the code
-Go through the Examples 1, 2, and 3.
+The `notebooks` folder contains a series of notebooks. `to_parquet` notebooks show how to convert the Argo profiles to parquet. The Examples 1 to 4 show how to access the data. 
 
 ### MATLAB access
 The folder `matlab` contains an example to access the Argo Core and BGC parquet databases with MATLAB. 
@@ -44,6 +44,8 @@ The most recent version of MATLAB is recommended, as the tools to access parquet
 Note that the databases needs to be provided separately at the moment. [Reach out](enrico.milanese@whoi.edu) for a link to download them.
 
 ### Log
+* 2024.08.21: dask conversion dedicated notebook and tools, moved notebooks to dedicated folder
+* 2024.08.08: speed tests for different partitioning
 * 2024.08.05: added filtering tools for MATLAB
 * 2024.08.03: conversion and read now doable with Dask; speed tests added
 * 2024.07.30: coiled-AWS example added for self-managing aws access
