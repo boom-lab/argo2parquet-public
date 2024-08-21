@@ -1,3 +1,4 @@
+##########################################################################
 from datetime import datetime, timedelta
 from dateutil.parser import parse as parsedate
 import requests
@@ -29,6 +30,8 @@ else:
                 yield chunk
 
 root = '.'
+##########################################################################
+
 # Function to download and parse GDAC synthetic profile index file
 def argo_gdac(gdac_path='./', dataset="bgc", lat_range=None,lon_range=None,start_date=None,end_date=None,sensors=None,floats=None,overwrite_profiles=False,skip_downloads=True,download_individual_profs=False,save_to=None,verbose=True,dryrun=False,dac_url_root=None,checktime=True, NPROC=1):
     """Downloads GDAC Sprof index file, then selects float profiles based on criteria.
@@ -65,6 +68,10 @@ def argo_gdac(gdac_path='./', dataset="bgc", lat_range=None,lon_range=None,start
           dac_url_root: root directory to download/copy data from
           NPROC: number of processors to use to donwload argo files
 
+    returns:
+          wmoids: array containing the WMO identifiers of the floats of the downloaded profiles
+          gdac_index_subset: dataframe with metadata of the profiles
+          all_local_fnames: (optional) list of paths to the downloaded *_prof or *_Sprof files
     """
 
     if dataset=="bgc":
@@ -219,18 +226,10 @@ def argo_gdac(gdac_path='./', dataset="bgc", lat_range=None,lon_range=None,start
     else:
         return wmoids, gdac_index_subset
 
+#------------------------------------------------------------------------------#
 # download all individual profiles in df
 def download_profiles(df,gdac_root='https://www.usgodae.org/ftp/outgoing/argo/',local_root='./gdac',overwrite=False,verbose=True,checktime=True):
-    """[summary]
-
-    Args:
-        df ([type]): [description]
-        gdac_root (str, optional): [description]. Defaults to 'https://data-argo.ifremer.fr/'.
-        local_root (str, optional): [description]. Defaults to './gdac'.
-
-    Returns:
-        [type]: [description]
-    """
+    """download all individual profiles in df"""
     downloaded_filenames = []
     for p_idx in df.index:
         filename = df.loc[p_idx]['filename']
@@ -242,8 +241,16 @@ def download_profiles(df,gdac_root='https://www.usgodae.org/ftp/outgoing/argo/',
         downloaded_filenames.append(filename)
     return downloaded_filenames
 
+#------------------------------------------------------------------------------#
 # Request url
 def get_func(url,stream=True):
+    """Request url
+
+    Arguments:
+    url -- GDAC path to profile file
+
+    returns url response
+    """
     try:
         return requests.get(url,stream=stream,auth=None,verify=False)
     except requests.exceptions.ConnectionError as error_tag:
@@ -251,8 +258,10 @@ def get_func(url,stream=True):
         time.sleep(1)
         return get_func(url,stream=stream)
 
+#------------------------------------------------------------------------------#
 # Get url file modification time
 def get_time_url(url):
+    """Get the most recent modification time of the url"""
     try:
         r = requests.head(url)
         url_time = r.headers['last-modified']
@@ -266,68 +275,18 @@ def get_time_url(url):
     except Exception as e:
         print("Other error occurred:", e)
 
-# Function to download a single file
-# def download_file(url_path,filename,save_to,overwrite,verbose,checktime):
-
-#     """Downloads and saves a file from a given URL using HTTP protocol.
-
-#     Note: If '404 file not found' error returned, function will return without downloading anything.
-
-#     Arguments:
-#         url_path: root URL to download from including trailing slash ('/')
-#         filename: filename to download including suffix
-#         save_to: None (to download to root Google Drive GO-BGC directory)
-#                  or directory path
-#         overwrite: False to leave existing files in place
-#                    or True to overwrite existing files (neglected if checktime is true)
-#         checktime: downloads file from url_path if they are newer than file on disk
-#                    (overwrite flag is neglected)
-#         verbose: True to announce progress
-#                  or False to stay silent
-
-#     """
-
-#     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-#     if save_to is None:
-#         save_to = root
-#     localfile = os.path.join(save_to,filename)
-#     if verbose: print('>>>> Destination file: ' + str(localfile) + '.')
-#     try:
-
-#         if os.path.exists(localfile):
-#             if checktime:
-#                 current_file_time = datetime.fromtimestamp(os.path.getmtime(localfile))
-#                 new_file_time = get_time_url(url_path + filename)
-#                 tz = new_file_time.tzinfo
-#                 current_file_time = current_file_time.replace(tzinfo=tz).astimezone(tz)
-#                 if not new_file_time > current_file_time:
-#                     if verbose: print('>>> File ' + filename + ' at requested URL (' + str(url_path) + ') is not newer than file on disk and is not downloaded.')
-#                     return
-
-#             elif not overwrite:
-#                 if verbose: print('>>> File ' + filename + ' already exists. Leaving current version.')
-#                 return
-#             else:
-#                 if verbose: print('>>> File ' + filename + ' already exists. Overwriting with new version.')
-
-
-#         response = get_func(url_path + filename,stream=True)
-
-#         if response.status_code == 404:
-#             if verbose: print('>>> File ' + filename + ' returned 404 error during download (requested URL: ' + str(url_path) + ').')
-#             return
-#         with open(save_to+filename,'wb') as out_file:
-#             shutil.copyfileobj(response.raw,out_file)
-#             del response
-
-#         if verbose: print('>>> Successfully downloaded ' + filename + '.')
-
-#     except:
-#         if verbose: print('>>> An error occurred while trying to download ' + filename + ' from ' + url_path + '.')
-
+#------------------------------------------------------------------------------#
 # Function to loop downloads for parallel batches
 def download_file_mp( rank, overwrite_profiles, verbose, checktime, chunk_url, chunk_fname, chunk_saveto):
+    """Function for each thread to loop over the files within their chunk
+
+    Arguments:
+    rank: thread number
+    chunk_url: thread chunk of url address to GDAC files
+    chunk_fname: thread chunk of file names for downloaded files
+    chunk_saveto: thread chunk of destination paths for downloaded files
+    (other arguments as in argo_gdac function)
+    """
 
     if rank is not None:
         rank_str = "#" + str(rank) + ": "
@@ -340,21 +299,14 @@ def download_file_mp( rank, overwrite_profiles, verbose, checktime, chunk_url, c
         args = [url_path, filename, save_to, overwrite_profiles, verbose, checktime, rank]
         download_file(args)
 
-
+#------------------------------------------------------------------------------#
 # Function to download a single file
 def download_file(args):
-
-    url_path,filename,save_to,overwrite,verbose,checktime,rank = args
-
-    if rank is not None:
-        rank_str = "#" + str(rank) + ": "
-    else:
-        rank_str = ''
     """Downloads and saves a file from a given URL using HTTP protocol.
 
     Note: If '404 file not found' error returned, function will return without downloading anything.
 
-    Arguments:
+    Arguments (compacted in args):
         url_path: root URL to download from including trailing slash ('/')
         filename: filename to download including suffix
         save_to: None (to download to root Google Drive GO-BGC directory)
@@ -365,8 +317,14 @@ def download_file(args):
                    (overwrite flag is neglected)
         verbose: True to announce progress
                  or False to stay silent
-
     """
+
+    url_path,filename,save_to,overwrite,verbose,checktime,rank = args
+
+    if rank is not None:
+        rank_str = "#" + str(rank) + ": "
+    else:
+        rank_str = ''
 
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -374,8 +332,8 @@ def download_file(args):
         save_to = root
     localfile = os.path.join(save_to,filename)
     if verbose: print(rank_str + '>>>> Destination file: ' + str(localfile) + '.')
-    try:
 
+    try:
         if os.path.exists(localfile):
             if checktime:
                 current_file_time = datetime.fromtimestamp(os.path.getmtime(localfile))
@@ -407,6 +365,7 @@ def download_file(args):
     except:
         if verbose: print(rank_str + '>>> An error occurred while trying to download ' + filename + ' from ' + url_path + '.')
 
+#------------------------------------------------------------------------------#
 # Return true if current profile collection on disk is more recent than all
 # single profiles in index file (for given wmoid)
 def more_recent(local_filename, wmoid, gdac_index_subset):

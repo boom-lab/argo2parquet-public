@@ -34,10 +34,11 @@ class daskTools():
         """Constructor
 
         Arguments:
-        db_type  -- "PHY" for physical Argo, "BGC" for biogeochemical Argo
-        out_dir  -- destination directory for the converted database
-        flist    -- list of paths to Argo files to be converted
-        chunk    -- number of files processed at a time by dask
+        db_type     -- "PHY" for physical Argo, "BGC" for biogeochemical Argo
+        out_dir     -- destination directory for the converted database
+        flist       -- list of paths to Argo files to be converted
+        schema_path -- path to ArgoPHY_schema.metadata and ArgoBGC_schema.metadata
+        chunk       -- number of files processed at a time by dask
         """
 
         if db_type is None:
@@ -60,9 +61,9 @@ class daskTools():
         self.chunk = chunk
 
         if schema_path is None:
-            self.schema_path = './schemas/Argo' + self.db_type + '_schema.metadata'
+            self.schema_path = '../schemas/Argo' + self.db_type + '_schema.metadata'
         else:
-            self.schema_path = schema_path
+            self.schema_path = schema_path + 'Argo' + self.db_type + '_schema.metadata'
         self.__translate_pq_to_pd()
 
         self.__assign_vars()
