@@ -2,12 +2,12 @@ clear all;
 
 % Loading coastlines
 S = shaperead("./GSHHG/GSHHS_shp/i/GSHHS_i_L1.shp");
-precision = 1e4;
+precision = 1e2;
 S = shapesByArea(S,precision);
 % plotCoastlines(S,precision);
 
 % Creating empty world grid at 0.01 degree resolution
-resolution = 1;%0.01; % degrees
+    resolution = 1;%0.01; % degrees
 worldLat0 =  -90;
 worldLat1 =   90;
 worldLon0 = -180;
