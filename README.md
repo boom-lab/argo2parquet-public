@@ -7,6 +7,8 @@ NB: the development is ongoing and in its infant stage, more complete documentat
 ### Table of Contents
 1. [Requirements](#requirements)
 2. [Running the code](#running-the-code)
+   1. [Converting files](#converting-files)
+   2. [Reading parquet database](#reading-parquet-database)
 3. [MATLAB access](#matlab-access)
 4. [Log](#log)
 5. [TODO](#TODO)
@@ -25,6 +27,20 @@ Python packages:
 * cartopy 0.23.0
 * matplotlib 3.9.0
 
+### Running the code
+The `notebooks` folder contains a series of notebooks. `to_parquet` notebooks show how to convert the Argo profiles to parquet. The Examples 1 to 4 show how to access the data.
+
+#### Converting files
+Two notebooks show two different ways of converting the Argo netCDF files:
+
+* `to_parquet_dask`: it uses the dask package to optimize and parallelize the operations of loading into memory multiple datasets and convert them taking in consideration their in-memory size.
+
+* `to_parquet_mp`: achieves similar results as the previous one, but using the multiprocessing package. This was the first parallelized version of the converter, and it will probably be removed once I have confirmed that all the warnings in the dask notebook are harmless.
+
+#### Reading parquet database
+
+Examples 1 to 4 show different how to access the parquet database through different use cases. Each notebook has a Poseidon/cluster version and a AWS version, showing how to access data in different storage points (local vs cloud). A coiled-AWS example is a prototype for future optimizations of cloud access. 
+
 ##### For cluster/Poseidon examples
 Examples with 'Poseidon' or 'cluster' in their name store or access data in WHOI's server. You should be able to easily adapt these examples for your own server or local machine by changing the paths accordingly, as the code itself does not require any credentials (the notebooks are meant to run directly on the server).
 
@@ -32,9 +48,6 @@ If you want to exectue them on Poseidon, you will need access to both WHOI's net
 
 ##### For AWS examples
 You will need to install also `boto3 (1.34.140)`. At this time the bucket with the data for the examples is public, so there is no need to set up your AWS S3 credentials. This might change in the future.
-
-### Running the code
-The `notebooks` folder contains a series of notebooks. `to_parquet` notebooks show how to convert the Argo profiles to parquet. The Examples 1 to 4 show how to access the data. 
 
 ### MATLAB access
 The folder `matlab` contains an example to access the Argo Core and BGC parquet databases with MATLAB. 
@@ -44,6 +57,7 @@ The most recent version of MATLAB is recommended, as the tools to access parquet
 Note that the databases needs to be provided separately at the moment. [Reach out](enrico.milanese@whoi.edu) for a link to download them.
 
 ### Log
+* 2024.08.22: multiprocessing conversion tools in dedicated module
 * 2024.08.21: dask conversion dedicated notebook and tools, moved notebooks to dedicated folder
 * 2024.08.08: speed tests for different partitioning
 * 2024.08.05: added filtering tools for MATLAB
