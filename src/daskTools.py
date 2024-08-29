@@ -10,13 +10,18 @@
 ##########################################################################
 import dask
 import dask.dataframe as dd
+import pyarrow as pa
 import pyarrow.parquet as pq
 import pandas as pd
 import xarray as xr
 import numpy as np
 # ignore pandas "educational" performance warnings
-from warnings import simplefilter
-simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
+import warnings
+warnings.simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
+#warnings.simplefilter(action="always", category=RuntimeWarning)
+#warnings.simplefilter(action="error", category=RuntimeWarning)
+from pprint import pprint
+from dask.distributed import print
 ##########################################################################
 
 class daskTools():
@@ -30,7 +35,7 @@ class daskTools():
     # Constructors/Destructors                                           #
     # ------------------------------------------------------------------ #
 
-    def __init__(self, db_type=None, out_dir=None, flist=None, schema_path='../schemas', chunk=2000):
+    def __init__(self, db_type=None, out_dir=None, flist=None, schema_path='../schemas', chunk=None):
         """Constructor
 
         Arguments:
@@ -58,7 +63,10 @@ class daskTools():
         else:
             self.out_dir = out_dir
 
-        self.chunk = chunk
+        if chunk is None:
+            self.chunk = 2000
+        else:
+            self.chunk = chunk
 
         if schema_path is None:
             self.schema_path = '../schemas/Argo' + self.db_type + '_schema.metadata'
@@ -69,6 +77,8 @@ class daskTools():
         self.__assign_vars()
         self.VARS = sorted(self.VARS)
 
+        self.failed_reads = [-1] * len(flist)
+
         pass
 
     # ------------------------------------------------------------------ #
@@ -78,15 +88,12 @@ class daskTools():
 #------------------------------------------------------------------------------#
 ## Delayed function to read an Argo profile into a dataframe with a prescribed
 ## schema
-    @dask.delayed
-    def read_argo(self,argo_file,VARS,partition_on_time=False):
+    @dask.delayed(nout=1)
+    def read_argo(self,argo_file):
         """ Read Argo file into dataframe
 
         Arguments:
         argo_file -- path to file
-        VARS      -- variables to include in target dataframe
-        partition_on_time -- bool to add field to schema to partition
-                             in subfolders on time
 
         Returns:
         df -- dataframe
@@ -97,26 +104,32 @@ class daskTools():
         returns from multiple workers
         """
 
+        okflag = -1
         try:
             ds = xr.open_dataset(argo_file, engine="argo") #loading into memory the profile
             invars = list(set(self.VARS) & set(list(ds.data_vars)))
             df = ds[invars].to_dataframe()
             df = df.reset_index() #flatten dataframe
+            okflag = 1
         except:
-            print('Failed on ' + str(argo_file))
+            okflag = 0
             # create empty dataframe
             df = pd.DataFrame({c: pd.Series(dtype=t) for c, t in self.pd_dict.items()})
 
+        if okflag == -1:
+            print('No comms from ' + str(argo_file))
+        elif okflag == 0:
+            print('Failed on ' + str(argo_file))
+        elif okflag == 1:
+            print('Ok on ' + str(argo_file))
+
         #ensures that all data frames have all the columns and in the same order; it creates NaNs where not present
-        df=df.reindex( columns=self.VARS )
+        df = df.reindex( columns=self.VARS )
 
         # enforcing dtypes otherwise to_parquet() gives error when appending
         df = df.astype(self.pd_dict)
 
-        # adding JULD_D variable for partitioning in time
-        # if partition_on_time:
-        #     df['JULD_D'] = df['JULD'].dt.floor('30D')
-
+        #return df, okflag
         return df
 
 #------------------------------------------------------------------------------#
@@ -144,27 +157,53 @@ class daskTools():
             if endchunk > len(flist):
                 endchunk = len(flist)
 
-            df = [ self.read_argo(file,self.pd_dict,self.VARS) for file in flist[initchunk:endchunk] ]
+            #df = []
+            #for idx, file in enumerate( flist[initchunk:endchunk] ):
+                #df_tmp, okflag = self.read_argo(file)
+                #df.append(df_tmp)
+                #self.failed_reads[idx+initchunk]=okflag
+
+            df = [ self.read_argo(file) for file in flist[initchunk:endchunk] ]
+
             df = dd.from_delayed(df) # creating unique df from list of df
+
             df = df.repartition(partition_size="300MB")
 
             name_function = lambda x: f"Argo{self.db_type}_dask_{j}_{x}.parquet"
 
             # to_parquet() triggers execution of lazy functions
+            append_db = False
             if j>0:
                 append_db = True # append to pre-existing partition
-            else:
-                append_db = False
-                df.to_parquet(
-                    out_dir,
-                    engine="pyarrow",
-                    name_function = name_function,
-                    append = append_db,
-                    write_metadata_file = True,
-                    write_index=False
-                )
+
+            df.to_parquet(
+                out_dir,
+                engine="pyarrow",
+                name_function = name_function,
+                append = append_db,
+                write_metadata_file = True,
+                write_index=False
+            )
+
+            print()
 
         print("stored.")
+
+#------------------------------------------------------------------------------#
+## Finalize compute of failed files
+    def failed_files(self):
+        """ Trigger dask compute of failed files"""
+
+        okflags = dask.compute(*self.failed_reads) #needs unpacked list of delayed objects
+
+        # find the files that failed on reads or never communicated if read was
+        # succesfull
+        self.failed_list = [file for idx, file in enumerate(self.flist) if okflags[idx]!=1]
+
+        failed_percentage = len(self.failed_list)/len(self.flist)*100
+
+        print("The following files failed on read and were not converted (" + str(failed_percentage) + "%):")
+        pprint(self.failed_list)
 
 #------------------------------------------------------------------------------#
 ## Convert parquet schema to pandas
@@ -180,11 +219,40 @@ class daskTools():
         pd_types = []
 
         for d in schema.types:
-            pd_types.append(d.to_pandas_dtype())
+            pd_types.append( self.__pa2pd(d) )
             pd_dict = dict(zip(schema.names,pd_types))
 
         self.pd_dict = pd_dict
 
+#------------------------------------------------------------------------------#
+## Convert pyarrow datatypes to pandas datatype
+    def __pa2pd(self,pa_dtype):
+
+        """Convert pyarrow datatypes to pandas datatype, forcing pyarrow integers
+        to null integers, as by default pyarrow's to_pandas_dtype() converts
+        them to numpy integers, which cannot handle NaNs.
+
+        Arguments:
+        pa_dtype -- parquet datatype
+
+        returns:
+        pd_dtype -- pandas datatype
+        """
+
+        if pa.types.is_integer(pa_dtype):
+            bit_width = pa_dtype.bit_width
+            if bit_width == 8:
+                return pd.Int8Dtype()
+            elif bit_width == 16:
+                return pd.Int16Dtype()
+            elif bit_width == 32:
+                return pd.Int32Dtype()
+            elif bit_width == 64:
+                return pd.Int64Dtype()
+            else:
+                raise ValueError(f"Unsupported integer bit width: {bit_width}")
+        else:
+            return pa_dtype.to_pandas_dtype()
 
 #------------------------------------------------------------------------------#
 ## Select PHY or BGC variables
