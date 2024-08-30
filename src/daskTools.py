@@ -71,7 +71,8 @@ class daskTools():
         if schema_path is None:
             self.schema_path = '../schemas/Argo' + self.db_type + '_schema.metadata'
         else:
-            self.schema_path = schema_path + 'Argo' + self.db_type + '_schema.metadata'
+            self.schema_path = schema_path
+        self.schema = pq.read_schema(self.schema_path)
         self.__translate_pq_to_pd()
 
         self.__assign_vars()
@@ -107,6 +108,7 @@ class daskTools():
         okflag = -1
         try:
             ds = xr.open_dataset(argo_file, engine="argo") #loading into memory the profile
+            ds = self.__add_data_mode(ds)
             invars = list(set(self.VARS) & set(list(ds.data_vars)))
             df = ds[invars].to_dataframe()
             df = df.reset_index() #flatten dataframe
@@ -129,7 +131,6 @@ class daskTools():
         # enforcing dtypes otherwise to_parquet() gives error when appending
         df = df.astype(self.pd_dict)
 
-        #return df, okflag
         return df
 
 #------------------------------------------------------------------------------#
@@ -182,7 +183,8 @@ class daskTools():
                 name_function = name_function,
                 append = append_db,
                 write_metadata_file = True,
-                write_index=False
+                write_index=False,
+                schema = self.schema
             )
 
             print()
@@ -214,13 +216,11 @@ class daskTools():
         pd_dict -- schema for pandas dataframe
         """
 
-        schema = pq.read_schema(self.schema_path)
-
         pd_types = []
 
-        for d in schema.types:
-            pd_types.append( self.__pa2pd(d) )
-            pd_dict = dict(zip(schema.names,pd_types))
+        for d in self.schema.types:
+            pd_types.append( self.__pa2pd(d) ) #conversion
+            pd_dict = dict(zip(self.schema.names,pd_types))
 
         self.pd_dict = pd_dict
 
@@ -251,8 +251,52 @@ class daskTools():
                 return pd.Int64Dtype()
             else:
                 raise ValueError(f"Unsupported integer bit width: {bit_width}")
+
+        elif pa.types.is_string(pa_dtype):
+            return pd.StringDtype()
+
         else:
             return pa_dtype.to_pandas_dtype()
+
+#------------------------------------------------------------------------------#
+## Add data mode to variable for each parameter
+    def __add_data_mode(self, ds):
+        """For each parameter <PARAM>, build a data variable <PARAM>_DATA_MODE
+        of dimension N_PROF containing the data mode (R, A, D) for each profile
+
+        Arguments:
+        ds -- xarray dataset from the profile file of the Argo float
+
+        returns:
+        ds -- updated xarray dataset with the added <PARAM>_DATA_MODE
+
+        NB: this applies to BGC profiles, Core profiles need to be treated
+        differently
+        """
+        if self.db_type != "BGC":
+            raise ValueError("Addition of data mode only supported for BGC dataset at the moment.")
+
+        for p in ds['N_PARAM'].values:
+
+            # generate variable names
+            var_data_mode_name = ds['PARAMETER'].sel(N_CALIB=0).sel(N_PROF=0).sel(N_PARAM=p).values
+            var_data_mode_name = str( np.char.replace(var_data_mode_name," ","") ) + '_DATA_MODE'
+
+            # assign data mode values
+            var_data_mode_values = ds['PARAMETER_DATA_MODE'].sel(N_PARAM=p).values
+
+            # generate data array
+            param_data_mode = xr.DataArray(
+                var_data_mode_values,
+                dims='N_PROF',
+                coords={'N_PROF': ds.coords['N_PROF']},
+                name=var_data_mode_name
+            )
+
+            # update xarray dataset
+            ds[var_data_mode_name] = param_data_mode
+
+        return ds
 
 #------------------------------------------------------------------------------#
 ## Select PHY or BGC variables
@@ -466,7 +510,36 @@ class daskTools():
                 'DOWNWELLING_PAR_dPRES',
                 'DOWNWELLING_PAR_ADJUSTED',
                 'DOWNWELLING_PAR_ADJUSTED_QC',
-                'DOWNWELLING_PAR_ADJUSTED_ERROR'
+                'DOWNWELLING_PAR_ADJUSTED_ERROR',
+                'PRES_DATA_MODE',
+                'TEMP_DATA_MODE',
+                'PSAL_DATA_MODE',
+                'DOXY_DATA_MODE',
+                'BBP_DATA_MODE',
+                'BBP470_DATA_MODE',
+                'BBP532_DATA_MODE',
+                'BBP700_DATA_MODE',
+                'TURBIDITY_DATA_MODE',
+                'CP_DATA_MODE',
+                'CP660_DATA_MODE',
+                'CHLA_DATA_MODE',
+                'CDOM_DATA_MODE',
+                'NITRATE_DATA_MODE',
+                'BISULFIDE_DATA_MODE',
+                'PH_IN_SITU_TOTAL_DATA_MODE',
+                'DOWN_IRRADIANCE_DATA_MODE',
+                'DOWN_IRRADIANCE380_DATA_MODE',
+                'DOWN_IRRADIANCE412_DATA_MODE',
+                'DOWN_IRRADIANCE443_DATA_MODE',
+                'DOWN_IRRADIANCE490_DATA_MODE',
+                'DOWN_IRRADIANCE555_DATA_MODE',
+                'UP_IRRADIANCE_DATA_MODE',
+                'UP_IRRADIANCE380_DATA_MODE',
+                'UP_IRRADIANCE412_DATA_MODE',
+                'UP_IRRADIANCE443_DATA_MODE',
+                'UP_IRRADIANCE490_DATA_MODE',
+                'UP_IRRADIANCE555_DATA_MODE',
+                'DOWNWELLING_PAR_DATA_MODE',
             ]
 
         else:
