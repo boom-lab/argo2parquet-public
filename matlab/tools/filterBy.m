@@ -31,17 +31,28 @@ function updatedFilter = filterBy(varName,minValue,maxValue,varargin)
         error('Too many input arguments, maximum is five.')
     elseif nargin < 3
         error('Not enough input arguments, minimum four are needed.')
-    elseif nargin == 4
+    elseif nargin >= 4
         oldFilter = varargin{1};
         if ~iscell(oldFilter)
             error('Input filter is not a cell.');
-        elseif ~size(oldFilter, 2) == 3
-            error('Input filter cell must have three columns.');
         end
-        append = true;
+        if ~size(oldFilter,1) == 0
+            append = true;
+        elseif ~size(oldFilter, 2) == 4
+            error('Input filter cell must have four columns.');
+        end
+        
     end
 
-    newFilter = {varName, minValue, maxValue};
+    cond = "AND";
+    if nargin == 5
+        cond = varargin{2};
+    end
+    if ~( strcmp(cond,"AND") | strcmp(cond,"OR") )
+        error("Filter condition cond can only be 'AND' or 'OR'.")
+    end
+
+    newFilter = {varName, minValue, maxValue, cond};
 
     % update filters cell
     if append

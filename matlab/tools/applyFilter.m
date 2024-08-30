@@ -1,22 +1,30 @@
-function pds = applyFilter(pds,conditions)
+function [pds, filter] = applyFilter(pds,conditions)
 
 % Apply filter to ParquetDatastore object of the database
 %
 % pds: ParquetDatastore object of the database
 % filters: Nx3 cells containing updated list of N filters
+% contraint: type of filter, "AND" or "OR"
 
     % generate filters to apply to parquet datastore compatible with
     % parquet datastore grammar
     rf = rowfilter(pds);
-    filter = generateFilter(rf,conditions(1,:));
+    filter = generateFilter(rf,conditions(1,1:3));
     conditionsNb = size(conditions, 1);
     if conditionsNb > 1
         for j=2:conditionsNb
-            filterToAdd = generateFilter(rf,conditions(j,:));
+            filterToAdd = generateFilter(rf,conditions(j,1:3));
 
             % generate combined filter taking into account of all
             % conditions that we have looped over so far
-            filter = filter & filterToAdd;
+            constraint = conditions{j,4};
+            if strcmp(constraint,"AND")
+                filter = filter & filterToAdd;
+            elseif strcmp(constraint,"OR")
+                filter = filter | filterToAdd;
+            else
+                error("Provided constraint is not of AND or OR type.")
+            end
         end
     end
 

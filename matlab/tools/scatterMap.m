@@ -1,4 +1,4 @@
-function scatterMap(data,varName,plotTitle)
+function scatterMap(data,varName,plotTitle,varargin)
 
 % Plot scatter map of varName
 %
@@ -12,6 +12,19 @@ function scatterMap(data,varName,plotTitle)
 %
 % scatterMap(data,'TEMP_ADJUSTED')
 % creates and displays map with scattered plot of delayed temperature data
+
+    if isstring(varName)
+        varName = convertStringsToChars(varName);
+    end
+
+    auto = false;
+    if nargin > 3
+        if strcmp(varargin{1},'auto')
+            auto = true;
+        else
+            error('Argument in position 4 not compatible.')
+        end
+    end
 
     % check that (lat0,lon0) are unique, otherwise average data
     [G, LAT, LON] = findgroups(data.LATITUDE,data.LONGITUDE);
@@ -36,8 +49,11 @@ function scatterMap(data,varName,plotTitle)
     
     % enableDefaultInteractivity(gx);
     geobasemap('satellite');
-    geolimits( latlim, lonlim );
-    
+
+    if ~auto
+        geolimits( latlim, lonlim );
+    end
+
     geoscatter(...
         TID.LATITUDE, ...
         TID.LONGITUDE, ...
@@ -47,7 +63,9 @@ function scatterMap(data,varName,plotTitle)
         );
 
     % cosmetics
-    colormap("copper")
+    if ~auto
+        colormap("copper")
+    end
     colorbar;
     title(plotTitle);
 
