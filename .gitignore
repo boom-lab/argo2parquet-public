@@ -1,5 +1,13 @@
-# Data folders
+# Local folders with data or logs to ignore
 data_test/
+slurm-logs/
+log*/
+figure*/
+
+# untitled and sketch notebooks
+untitled*.ipynb
+Untitled*.ipynb
+*sketch*.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

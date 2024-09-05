@@ -57,6 +57,7 @@ The most recent version of MATLAB is recommended, as the tools to access parquet
 Note that the databases needs to be provided separately at the moment. [Reach out](enrico.milanese@whoi.edu) for a link to download them.
 
 ### Log
+* 2024.09.05: included exception for float changing path in gdac (e.g. from coriolis to bodc, same WMO ID)
 * 2024.08.22: multiprocessing conversion tools in dedicated module
 * 2024.08.21: dask conversion dedicated notebook and tools, moved notebooks to dedicated folder
 * 2024.08.08: speed tests for different partitioning
