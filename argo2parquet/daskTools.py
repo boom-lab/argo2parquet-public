@@ -14,6 +14,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pandas as pd
 import xarray as xr
+import argopy
 import numpy as np
 # ignore pandas "educational" performance warnings
 import warnings
@@ -106,14 +107,15 @@ class daskTools():
         """
 
         okflag = -1
+
         try:
             ds = xr.open_dataset(argo_file, engine="argo") #loading into memory the profile
-            ds = self.__add_data_mode(ds)
             invars = list(set(self.VARS) & set(list(ds.data_vars)))
             df = ds[invars].to_dataframe()
             df = df.reset_index() #flatten dataframe
             okflag = 1
-        except:
+        except Exception as e:
+            print("The following exception occurred:", e)
             okflag = 0
             # create empty dataframe
             df = pd.DataFrame({c: pd.Series(dtype=t) for c, t in self.pd_dict.items()})
@@ -123,7 +125,7 @@ class daskTools():
         elif okflag == 0:
             print('Failed on ' + str(argo_file))
         elif okflag == 1:
-            print('Ok on ' + str(argo_file))
+            print('Processing ' + str(argo_file))
 
         #ensures that all data frames have all the columns and in the same order; it creates NaNs where not present
         df = df.reindex( columns=self.VARS )
@@ -135,7 +137,7 @@ class daskTools():
 
 #------------------------------------------------------------------------------#
 ## Performs conversion
-    def convert_to_parquet(self,flist=None, out_dir=None, chunk=None):
+    def convert_to_parquet(self, flist=None, out_dir=None, chunk=None):
         """Performs conversion by building compute graph and triggering
         operations
 
@@ -257,46 +259,6 @@ class daskTools():
 
         else:
             return pa_dtype.to_pandas_dtype()
-
-#------------------------------------------------------------------------------#
-## Add data mode to variable for each parameter
-    def __add_data_mode(self, ds):
-        """For each parameter <PARAM>, build a data variable <PARAM>_DATA_MODE
-        of dimension N_PROF containing the data mode (R, A, D) for each profile
-
-        Arguments:
-        ds -- xarray dataset from the profile file of the Argo float
-
-        returns:
-        ds -- updated xarray dataset with the added <PARAM>_DATA_MODE
-
-        NB: this applies to BGC profiles, Core profiles need to be treated
-        differently
-        """
-        if self.db_type != "BGC":
-            raise ValueError("Addition of data mode only supported for BGC dataset at the moment.")
-
-        for p in ds['N_PARAM'].values:
-
-            # generate variable names
-            var_data_mode_name = ds['PARAMETER'].sel(N_CALIB=0).sel(N_PROF=0).sel(N_PARAM=p).values
-            var_data_mode_name = str( np.char.replace(var_data_mode_name," ","") ) + '_DATA_MODE'
-
-            # assign data mode values
-            var_data_mode_values = ds['PARAMETER_DATA_MODE'].sel(N_PARAM=p).values
-
-            # generate data array
-            param_data_mode = xr.DataArray(
-                var_data_mode_values,
-                dims='N_PROF',
-                coords={'N_PROF': ds.coords['N_PROF']},
-                name=var_data_mode_name
-            )
-
-            # update xarray dataset
-            ds[var_data_mode_name] = param_data_mode
-
-        return ds
 
 #------------------------------------------------------------------------------#
 ## Select PHY or BGC variables
@@ -510,36 +472,7 @@ class daskTools():
                 'DOWNWELLING_PAR_dPRES',
                 'DOWNWELLING_PAR_ADJUSTED',
                 'DOWNWELLING_PAR_ADJUSTED_QC',
-                'DOWNWELLING_PAR_ADJUSTED_ERROR',
-                'PRES_DATA_MODE',
-                'TEMP_DATA_MODE',
-                'PSAL_DATA_MODE',
-                'DOXY_DATA_MODE',
-                'BBP_DATA_MODE',
-                'BBP470_DATA_MODE',
-                'BBP532_DATA_MODE',
-                'BBP700_DATA_MODE',
-                'TURBIDITY_DATA_MODE',
-                'CP_DATA_MODE',
-                'CP660_DATA_MODE',
-                'CHLA_DATA_MODE',
-                'CDOM_DATA_MODE',
-                'NITRATE_DATA_MODE',
-                'BISULFIDE_DATA_MODE',
-                'PH_IN_SITU_TOTAL_DATA_MODE',
-                'DOWN_IRRADIANCE_DATA_MODE',
-                'DOWN_IRRADIANCE380_DATA_MODE',
-                'DOWN_IRRADIANCE412_DATA_MODE',
-                'DOWN_IRRADIANCE443_DATA_MODE',
-                'DOWN_IRRADIANCE490_DATA_MODE',
-                'DOWN_IRRADIANCE555_DATA_MODE',
-                'UP_IRRADIANCE_DATA_MODE',
-                'UP_IRRADIANCE380_DATA_MODE',
-                'UP_IRRADIANCE412_DATA_MODE',
-                'UP_IRRADIANCE443_DATA_MODE',
-                'UP_IRRADIANCE490_DATA_MODE',
-                'UP_IRRADIANCE555_DATA_MODE',
-                'DOWNWELLING_PAR_DATA_MODE',
+                'DOWNWELLING_PAR_ADJUSTED_ERROR'
             ]
 
         else:

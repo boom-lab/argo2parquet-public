@@ -74,6 +74,8 @@ def argo_gdac(gdac_path='./', dataset="bgc", lat_range=None,lon_range=None,start
           all_local_fnames: (optional) list of paths to the downloaded *_prof or *_Sprof files
     """
 
+    print("gdac_path in at:")
+    print(gdac_path)
     if dataset=="bgc":
         gdac_name = 'argo_synthetic-profile_index.txt'
     elif dataset=="phy":
@@ -84,7 +86,9 @@ def argo_gdac(gdac_path='./', dataset="bgc", lat_range=None,lon_range=None,start
     if not os.path.exists(gdac_path + gdac_name):
         print(gdac_name + ' not found in ' + gdac_path + '. Downloading it.')
         gdac_url  = 'https://usgodae.org/pub/outgoing/argo/'
-        download_file(gdac_url,gdac_name,save_to=gdac_path,overwrite=True,verbose=verbose,checktime=checktime)
+
+        args = (gdac_url,gdac_name,gdac_path,True,verbose,checktime,None)
+        download_file(args)
 
 
   # Load index file into Pandas DataFrame
@@ -138,9 +142,11 @@ def argo_gdac(gdac_path='./', dataset="bgc", lat_range=None,lon_range=None,start
         for sensor in sensors:
             gdac_index_subset = gdac_index_subset.loc[gdac_index_subset['parameters'].str.contains(sensor),:]
 
-    # Examine subsetted profiles
-    wmoids = gdac_index_subset['wmoid'].unique()
-    wmoid_filepaths = gdac_index_subset['filepath_main'].unique()
+    # There seems to be floats that change management (e.g. from coriolis to
+    # bodc), the path is then unique but not the WMO ID
+    wmoid_filepaths, unique_idx = np.unique(gdac_index_subset["filepath_main"], return_index = True)
+    wmoids = gdac_index_subset.iloc[unique_idx]['wmoid']
+    wmoids = wmoids.to_numpy()
 
     # Just return list of floats and DataFrame with subset of index file, or download each profile
     if not skip_downloads:
@@ -257,6 +263,14 @@ def get_func(url,stream=True):
         print('Error connecting:',error_tag)
         time.sleep(1)
         return get_func(url,stream=stream)
+    except requests.exceptions.RequestException as e:
+        print("Request failed:", e)
+    except requests.exceptions.HTTPError as e:
+        print("HTTP error occurred:", e)
+        print("Status code:", response.status_code)
+        print("Response content:", response.text)
+    except Exception as e:
+        print("Other error occurred:", e)
 
 #------------------------------------------------------------------------------#
 # Get url file modification time
@@ -362,7 +376,8 @@ def download_file(args):
             del response
         if verbose: print(rank_str + '>>> Successfully downloaded ' + filename + '.')
 
-    except:
+    except Exception as e:
+        print("The following error occurred:", e)
         if verbose: print(rank_str + '>>> An error occurred while trying to download ' + filename + ' from ' + url_path + '.')
 
 #------------------------------------------------------------------------------#
