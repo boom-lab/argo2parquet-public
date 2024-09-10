@@ -14,10 +14,6 @@ from argo2parquet.argo_download import argo_download
 from argo2parquet.argo_convert import argo_convert
 import argopy
 import time
-
-# outdir_parquet = "/vortexfs1/share/boom/data/nc2parquet_test/parquet2/"
-# gdac_path = "/vortexfs1/share/boom/data/nc2parquet_test/"
-# outdir_nc = "/vortexfs1/share/boom/data/nc2parquet_test/GDAC/dac/"
 ##########################################################################
 
 def main():
@@ -45,21 +41,21 @@ def main():
     parser.add_argument(
         "--gdac_index",
         type=str,
-        default="./data_test/",
+        default="./data/",
         help=" Path to profiles index files."
     )
 
     parser.add_argument(
         "--db_nc",
         type=str,
-        default="./data_test/GDAC/dac/",
+        default="./data/GDAC/dac/",
         help=" Root folder where databases will be downloaded to."
     )
 
     parser.add_argument(
         "--db_parquet",
         type=str,
-        default="./data_test/parquet/",
+        default="./data/parquet/",
         help=" Root folder where parquet database will be stored to."
     )
 
