@@ -125,7 +125,7 @@ class daskTools():
         elif okflag == 0:
             print('Failed on ' + str(argo_file))
         elif okflag == 1:
-            print('Processing ' + str(argo_file))
+            print('Processing    ' + str(argo_file))
 
         #ensures that all data frames have all the columns and in the same order; it creates NaNs where not present
         df = df.reindex( columns=self.VARS )
@@ -268,38 +268,42 @@ class daskTools():
         if self.db_type == "PHY":
             self.VARS = [
                 'PLATFORM_NUMBER',
-                'TEMP',
-                'PRES',
-                'LONGITUDE',
-                'PRES_ADJUSTED',
-                'LATITUDE',
-                'TEMP_QC',
-                'TEMP_ADJUSTED_QC',
-                'PSAL',
-                'PRES_ADJUSTED_ERROR',
-                'JULD',
-                'CYCLE_NUMBER',
-                'TEMP_ADJUSTED',
-                'TEMP_ADJUSTED_ERROR',
-                'PSAL_ADJUSTED_QC',
-                'PSAL_QC',
-                'PRES_ADJUSTED_QC',
-                'PSAL_ADJUSTED',
-                'PSAL_ADJUSTED_ERROR',
-                'PRES_QC',
                 'N_PROF',
-                'N_LEVELS'
+                'N_LEVELS',
+                'CYCLE_NUMBER',
+                'LATITUDE',
+                'LONGITUDE',
+                'POSITION_QC',
+                'JULD',
+                'JULD_QC',
+                'PRES',
+                'PRES_QC',
+                'PRES_ADJUSTED',
+                'PRES_ADJUSTED_QC',
+                'PRES_ADJUSTED_ERROR',
+                'TEMP',
+                'TEMP_QC',
+                'TEMP_ADJUSTED',
+                'TEMP_ADJUSTED_QC',
+                'TEMP_ADJUSTED_ERROR',
+                'PSAL',
+                'PSAL_QC',
+                'PSAL_ADJUSTED',
+                'PSAL_ADJUSTED_QC',
+                'PSAL_ADJUSTED_ERROR',
             ]
 
         elif self.db_type == "BGC":
             self.VARS = [
-                'LATITUDE',
-                'LONGITUDE',
-                'JULD',
-                'CYCLE_NUMBER',
                 'PLATFORM_NUMBER',
                 'N_PROF',
                 'N_LEVELS',
+                'CYCLE_NUMBER',
+                'LATITUDE',
+                'LONGITUDE',
+                'POSITION_QC',
+                'JULD',
+                'JULD_QC',
                 'PRES',
                 'PRES_QC',
                 'PRES_ADJUSTED',

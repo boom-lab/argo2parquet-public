@@ -14,6 +14,7 @@ from warnings import simplefilter
 simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
 import argo2parquet.argo_tools as at
 import copy
+import time
 ##########################################################################
 
 def argo_download(gdac_path, outdir_nc, db_names, dryrun_flag):
@@ -27,10 +28,12 @@ def argo_download(gdac_path, outdir_nc, db_names, dryrun_flag):
     wmos_fp_bgc = []
 
     for k in range(len(db_names)):
+        start_time = time.time()
+
         db_name = db_names[k]
         print("Database " + db_name + "...")
 
-        wmos, df2, wmos_fp = at.argo_gdac(
+        wmos, metadata, wmos_fp = at.argo_gdac(
             gdac_path=gdac_path,
             dataset=db_name,
             save_to=outdir_nc,
@@ -45,12 +48,16 @@ def argo_download(gdac_path, outdir_nc, db_names, dryrun_flag):
 
         if db_name=="phy":
             wmos_fp_phy = copy.deepcopy(wmos_fp)
+            metadata_phy = metadata
         elif db_name=="bgc":
             wmos_fp_bgc = copy.deepcopy(wmos_fp)
+            metadata_bgc = metadata
 
         print("done.")
+        elapsed_time = time.time() - start_time
+        print("Time to donwload " + db_name + " database: " + str(elapsed_time))
 
-    return wmos_fp_phy, wmos_fp_bgc
+    return wmos_fp_phy, wmos_fp_bgc, metadata_phy, metadata_bgc
 
 
 ##########################################################################

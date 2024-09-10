@@ -13,6 +13,7 @@ import argparse
 from argo2parquet.argo_download import argo_download
 from argo2parquet.argo_convert import argo_convert
 import argopy
+import time
 
 # outdir_parquet = "/vortexfs1/share/boom/data/nc2parquet_test/parquet2/"
 # gdac_path = "/vortexfs1/share/boom/data/nc2parquet_test/"
@@ -20,6 +21,8 @@ import argopy
 ##########################################################################
 
 def main():
+
+    start_time = time.time()
 
     commandline = " ".join(sys.argv[:])
 
@@ -80,36 +83,46 @@ def main():
         db = [db]
 
     if download_dbs.lower()=="true":
+        dl_start_time = time.time()
         print("Updating the Argo databases...")
         print("Destination folder: " + outdir_nc)
-        flist_phy, flist_bgc = argo_download(gdac_path, outdir_nc, db, False)
+        flist_phy, flist_bgc, metadata_phy, metadata_bgc = argo_download(gdac_path, outdir_nc, db, False)
+        dl_elapsed_time = time.time() - dl_start_time
+        print("Download elapsed time: " + str(dl_elapsed_time))
+
     else:
-        import csv
-        fn1 = '/vortexfs1/home/enrico.milanese/projects/ARGO/nc2parquet/slurm-logs/flist_phy.csv'
-        fn2 = '/vortexfs1/home/enrico.milanese/projects/ARGO/nc2parquet/slurm-logs/flist_bgc.csv'
         print("Retrieving list of files from the Argo database(s)...")
         print("Looking into folder: " + outdir_nc)
         flist_phy = []
+        flist_bgc = []
+        metadata_phy = []
+        metadata_bgc = []
+
         if "phy" in db:
             with open(fn1, 'r', newline='') as file:
                 reader = csv.reader(file)
                 for row in reader:
                     flist_phy.append(row[0])
-            #flist_phy, _ = argo_download(gdac_path, outdir_nc, ["phy"], True)
+            flist_phy, _, metadata_phy, _ = argo_download(gdac_path, outdir_nc, ["phy"], True)
 
-        flist_bgc = []
         if "bgc" in db:
             with open(fn2, 'r', newline='') as file:
                 reader = csv.reader(file)
                 for row in reader:
                     flist_bgc.append(row[0])
 
-            #_, flist_bgc = argo_download(gdac_path, outdir_nc, ["bgc"], True)
+            _, flist_bgc, _, metadata_bgc = argo_download(gdac_path, outdir_nc, ["bgc"], True)
 
     if convert_dbs.lower()=="true":
+        conv_start_time = time.time()
         print("Converting the databases...")
         print("Destination folder: " + outdir_parquet)
-        argo_convert( [flist_phy, flist_bgc], db, outdir_parquet, "./schemas/")
+        argo_convert( [flist_phy, flist_bgc], [metadata_phy, metadata_bgc], db, outdir_parquet, "./schemas/")
+        conv_elapsed_time = time.time() - conv_start_time
+        print("Conversion elapsed time: " + str(conv_elapsed_time))
+
+    elapsed_time = time.time() - start_time
+    print("Total elapsed time: " + str(elapsed_time))
 
 ##########################################################################
 
