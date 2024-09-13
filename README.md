@@ -12,13 +12,14 @@ NB: the development is ongoing and in its infant stage, more complete documentat
 3. [Contact](#contact)
 
 ### Installation and usage
-From the root directory, execute:
+From the root directory, install it locally as:
 
 ``` sh
 pip install .
 ```
 
-You can then call `main.py`. 
+And to execute it: 
+`argo2parquet [-h] [-d DOWNLOAD] [-c CONVERT] [--gdac_index GDAC_INDEX] [--db_nc DB_NC] [--db_parquet DB_PARQUET] [--db DB]` 
 
 The code is meant to be used on an HPC machine, both for storage and for perfomance. It uses `dask`, which allows for parallelized lazy operations and larger-than-memory data management. It is currently set to use up to 10 workers and up to 30 threads.
 

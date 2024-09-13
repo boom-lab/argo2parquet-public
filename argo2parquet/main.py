@@ -20,6 +20,10 @@ def main():
 
     start_time = time.time()
 
+    # Ensure stdout and stderr are unbuffered
+    sys.stdout = open(sys.stdout.fileno(), 'w', buffering=1)
+    sys.stderr = open(sys.stderr.fileno(), 'w', buffering=1)
+
     commandline = " ".join(sys.argv[:])
 
     parser = argparse.ArgumentParser(description='Package to create average frame from an input video file.')

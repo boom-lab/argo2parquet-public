@@ -16,5 +16,10 @@ setup(
     author='Enrico Milanese',
     author_email='enrico.milanese@whoi.edu',
     packages=['argo2parquet'],
-    install_requires=parse_requirements('requirements.txt')
+    install_requires=parse_requirements('requirements.txt'),
+    entry_points={
+    'console_scripts': [
+        'argo2parquet = argo2parquet.main:main',  # Adjust this line
+    ],
+},
 )
