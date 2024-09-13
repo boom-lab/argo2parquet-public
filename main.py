@@ -95,18 +95,9 @@ def main():
         metadata_bgc = []
 
         if "phy" in db:
-            with open(fn1, 'r', newline='') as file:
-                reader = csv.reader(file)
-                for row in reader:
-                    flist_phy.append(row[0])
             flist_phy, _, metadata_phy, _ = argo_download(gdac_path, outdir_nc, ["phy"], True)
 
         if "bgc" in db:
-            with open(fn2, 'r', newline='') as file:
-                reader = csv.reader(file)
-                for row in reader:
-                    flist_bgc.append(row[0])
-
             _, flist_bgc, _, metadata_bgc = argo_download(gdac_path, outdir_nc, ["bgc"], True)
 
     if convert_dbs.lower()=="true":

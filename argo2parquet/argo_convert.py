@@ -39,13 +39,18 @@ def argo_convert( flists, metadata, db_names, outdir_parquet, schema_path):
         if db_name=="phy":
             flist = flist_phy
             metadata = metadata_phy
-            nw = 30
+            nw = 18
             tw = 1
+            memlim = "5.5GB"
         elif db_name=="bgc":
             flist = flist_bgc
             metadata = metadata_bgc
-            nw = 10
-            tw = 10
+            nw = 9
+            tw = 1
+            memlim = "11GB"
+
+        print("(nw, tw)")
+        print( (nw, tw) )
 
         # convert metadata
         if len(metadata) > 0:
@@ -55,12 +60,11 @@ def argo_convert( flists, metadata, db_names, outdir_parquet, schema_path):
             metadata.to_parquet(parquet_filename)
             print("Metadata stored to " + str(parquet_filename) + ".")
 
-        client = Client(
+            client = Client(
             n_workers=nw,
             threads_per_worker=tw,
             processes=True,
-            memory_limit="auto",
-            dashboard_address="40112"
+            memory_limit=memlim,
         )
 
         chunksize = 1000

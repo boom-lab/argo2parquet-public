@@ -3,6 +3,7 @@ data_test/
 slurm-logs/
 log*/
 figure*/
+data/
 
 # untitled and sketch notebooks
 untitled*.ipynb

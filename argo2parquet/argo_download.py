@@ -26,6 +26,8 @@ def argo_download(gdac_path, outdir_nc, db_names, dryrun_flag):
 
     wmos_fp_phy = []
     wmos_fp_bgc = []
+    metadata_phy = []
+    metadata_bgc = []
 
     for k in range(len(db_names)):
         start_time = time.time()
