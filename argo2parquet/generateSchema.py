@@ -102,7 +102,7 @@ class generateSchema():
             elif p=='JULD':
                 f = pa.field( p, pa.from_numpy_dtype(np.dtype('datetime64[ns]') ) )
 
-            elif p=='DIRECTION':
+            elif (p=='DIRECTION') or ('DATA_MODE' in p):
                 f = pa.field( p, pa.string() )
 
             else:
