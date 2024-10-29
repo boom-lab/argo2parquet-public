@@ -12,6 +12,7 @@ import argo2parquet.argo_tools as at
 import dask
 from dask.distributed import Client
 from argo2parquet.daskTools import daskTools
+from argo2parquet.generateSchema import generateSchema
 import time
 from pathlib import Path
 ##########################################################################
@@ -30,10 +31,8 @@ def argo_convert( flists, metadata, db_names, outdir_parquet, schema_path):
 
         db_name = db_names[k]
         print("Converting " + db_name + " database...")
-        if schema_path.endswith("_schema.metadata"):
-            schema_fname = schema_path
-        else:
-            schema_fname = schema_path+"Argo" + db_name.upper() + "_allParams_schema.metadata"
+        genSchema = generateSchema(outdir=schema_path, db=db_name)
+        schema_fname = genSchema.schema_fname
         print("Schema file for " + db_name + " database: " + schema_fname)
 
         if db_name=="phy":
@@ -71,7 +70,7 @@ def argo_convert( flists, metadata, db_names, outdir_parquet, schema_path):
 
         daskConverter = daskTools(
             db_type = db_name.upper(),
-            out_dir = outdir_parquet+db_name,
+            out_dir = outdir_parquet,
             flist = flist,
             schema_path = schema_fname,
             chunk = chunksize,

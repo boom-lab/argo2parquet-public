@@ -8,8 +8,8 @@ def parse_requirements(filename):
         return [line.strip() for line in f if line.strip() and not line.startswith('#')]
 
 setup(
-    name='nc2parquet',
-    version='0.1',
+    name='argo2parquet',
+    version='0.1.1',
     description='Module to convert Argo netCDF database to parquet',
     license="GNU GPLv3",
     long_description=long_description,
@@ -18,8 +18,8 @@ setup(
     packages=['argo2parquet'],
     install_requires=parse_requirements('requirements.txt'),
     entry_points={
-    'console_scripts': [
-        'argo2parquet = argo2parquet.main:main',  # Adjust this line
-    ],
-},
+        'console_scripts': [
+            'argo2parquet = argo2parquet.main:main',
+        ],
+    },
 )

@@ -2,7 +2,7 @@
 
 argo2parquet bulk-convert Argo data from the Global Data Assembly Centers (GDAC) from their original [NetCDF](https://www.unidata.ucar.edu/software/netcdf/) format to the [parquet](https://parquet.apache.org/) format.
 
-It converts profile files only, i.e. `<PLATFORM_NUMBER>_prof.nc` for Argo Core and `<PLATFORM_NUMBER>_Sprof.nc` for Argo BGC. Metadata for these files are stored
+It converts profile files only, i.e. `<PLATFORM_NUMBER>_prof.nc` for Argo Core and `<PLATFORM_NUMBER>_Sprof.nc` for Argo BGC. Metadata for these files are stored separately in a metadata file.
 
 NB: the development is ongoing and in its infant stage, more complete documentation will be added as developing and testing proceed.
 
@@ -31,7 +31,9 @@ During the tests that I have run, it took approximately these times:
 * Downloading Argo Core profile files: 2.5 hours
 * Downloading Argo BGC profile files: 30 mins
 * Converting Argo Core to parquet: 22 mins
-* Converting Argo BGC to parquet: 25 mins
+* Converting Argo BGC to parquet: 25 mins (v0.1) or 12 hours (v0.1.1)
+
+The difference in timing for Argo BGC is that v0.1.1 adds variables <PARAM>_DATA_MODE for each parameter <PARAM> included in the conversion. This is done in the original xarray dataset by splitting PARAMETER_DATA_MODE into all the <PARAM>_DATA_MODE variables. While this choice was to ensure consistent re-indexing across variables when converting the xarray dataset into a dask dataframe, there is a more efficient way that I am exploring and will be part of a future release. 
 
 The resulting databases are 13 GB (Core) and 7.2 GB (BGC) large.
 
@@ -46,6 +48,11 @@ At the moment, `argo_convert.py` contains hardcoded values for the number of wor
 The `notebooks` folder contains example of how to read the parquet databases.
 The notebooks also report reading times, which might not match what you get as they depend on the machine that the runs the notebooks, of course. Most of the times reported were obtained on WHOI's HPC cluster.
 
+### Log
+
+2024-10-29: (v0.1.1) Added DIRECTION and DATA_MODE data to both Core and BGC parquet databases.
+2024-09-13: (v0.1) First release.
+
 ### Contact
 
-For any questions or bugs, you can open an issue on github or reach out to me at [enrico.milanese@whoi.edu](mailto:enrico.milanese@whoi.edu).
+For any questions, bugs, ideas, etc, please open an issue or [reach out](mailto:enrico.milanese@whoi.edu).

@@ -13,6 +13,7 @@ import argparse
 from argo2parquet.argo_download import argo_download
 from argo2parquet.argo_convert import argo_convert
 import argopy
+import importlib.metadata
 import time
 ##########################################################################
 
@@ -26,7 +27,8 @@ def main():
 
     commandline = " ".join(sys.argv[:])
 
-    parser = argparse.ArgumentParser(description='Package to create average frame from an input video file.')
+    parser = argparse.ArgumentParser(description='Package to create parquet copy of Argo databases.')
+    parser.add_argument('--version', action='store_true', help="Show version and exit")
 
     parser.add_argument(
         "-d", "--download",
@@ -60,7 +62,7 @@ def main():
         "--db_parquet",
         type=str,
         default="./data/parquet/",
-        help=" Root folder where parquet database will be stored to."
+        help=" Folder where parquet database will be stored to."
     )
 
     parser.add_argument(
@@ -71,6 +73,12 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if args.version:
+        version = importlib.metadata.version(__package__)
+        print(f"argo2parquet version: {version}")
+        return
+
     download_dbs = args.download
     convert_dbs = args.convert
     gdac_path = args.gdac_index

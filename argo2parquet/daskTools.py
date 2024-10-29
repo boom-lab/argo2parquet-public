@@ -23,6 +23,7 @@ warnings.simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
 #warnings.simplefilter(action="error", category=RuntimeWarning)
 from pprint import pprint
 from dask.distributed import print
+import argo2parquet.params as params
 ##########################################################################
 
 class daskTools():
@@ -110,10 +111,20 @@ class daskTools():
 
         try:
             ds = xr.open_dataset(argo_file, engine="argo") #loading into memory the profile
-            invars = list(set(self.VARS) & set(list(ds.data_vars)))
+
+            # updating data modes for BGC argo floats data
+            if 'PARAMETER_DATA_MODE' in list(ds.data_vars):
+                if (ds['PARAMETER'].isel(N_CALIB=0) == ds['PARAMETER']).all():
+                    ds = self.__assign_data_mode(ds)
+                else:
+                    raise ValueError("PARAMETER not independent of N_CALIB.")
+            
+            ds_vars = list(ds.data_vars)
+            invars = list(set(self.VARS) & set(ds_vars))
             df = ds[invars].to_dataframe()
             df = df.reset_index() #flatten dataframe
             okflag = 1
+
         except Exception as e:
             print("The following exception occurred:", e)
             okflag = 0
@@ -160,12 +171,6 @@ class daskTools():
             if endchunk > len(flist):
                 endchunk = len(flist)
 
-            #df = []
-            #for idx, file in enumerate( flist[initchunk:endchunk] ):
-                #df_tmp, okflag = self.read_argo(file)
-                #df.append(df_tmp)
-                #self.failed_reads[idx+initchunk]=okflag
-
             df = [ self.read_argo(file) for file in flist[initchunk:endchunk] ]
 
             df = dd.from_delayed(df) # creating unique df from list of df
@@ -178,6 +183,7 @@ class daskTools():
             append_db = False
             if j>0:
                 append_db = True # append to pre-existing partition
+            overwrite_db = not append_db
 
             df.to_parquet(
                 out_dir,
@@ -186,7 +192,8 @@ class daskTools():
                 append = append_db,
                 write_metadata_file = True,
                 write_index=False,
-                schema = self.schema
+                schema = self.schema,
+                overwrite = overwrite_db
             )
 
             print()
@@ -265,224 +272,63 @@ class daskTools():
     def __assign_vars(self):
         """ Select variables in target Argo database"""
 
-        if self.db_type == "PHY":
-            self.VARS = [
-                'PLATFORM_NUMBER',
-                'N_PROF',
-                'N_LEVELS',
-                'CYCLE_NUMBER',
-                'LATITUDE',
-                'LONGITUDE',
-                'POSITION_QC',
-                'JULD',
-                'JULD_QC',
-                'PRES',
-                'PRES_QC',
-                'PRES_ADJUSTED',
-                'PRES_ADJUSTED_QC',
-                'PRES_ADJUSTED_ERROR',
-                'TEMP',
-                'TEMP_QC',
-                'TEMP_ADJUSTED',
-                'TEMP_ADJUSTED_QC',
-                'TEMP_ADJUSTED_ERROR',
-                'PSAL',
-                'PSAL_QC',
-                'PSAL_ADJUSTED',
-                'PSAL_ADJUSTED_QC',
-                'PSAL_ADJUSTED_ERROR',
-            ]
-
-        elif self.db_type == "BGC":
-            self.VARS = [
-                'PLATFORM_NUMBER',
-                'N_PROF',
-                'N_LEVELS',
-                'CYCLE_NUMBER',
-                'LATITUDE',
-                'LONGITUDE',
-                'POSITION_QC',
-                'JULD',
-                'JULD_QC',
-                'PRES',
-                'PRES_QC',
-                'PRES_ADJUSTED',
-                'PRES_ADJUSTED_QC',
-                'PRES_ADJUSTED_ERROR',
-                'TEMP',
-                'TEMP_QC',
-                'TEMP_dPRES',
-                'TEMP_ADJUSTED',
-                'TEMP_ADJUSTED_QC',
-                'TEMP_ADJUSTED_ERROR',
-                'PSAL',
-                'PSAL_QC',
-                'PSAL_dPRES',
-                'PSAL_ADJUSTED',
-                'PSAL_ADJUSTED_QC',
-                'PSAL_ADJUSTED_ERROR',
-                'DOXY',
-                'DOXY_QC',
-                'DOXY_dPRES',
-                'DOXY_ADJUSTED',
-                'DOXY_ADJUSTED_QC',
-                'DOXY_ADJUSTED_ERROR',
-                'BBP',
-                'BBP_QC',
-                'BBP_dPRES',
-                'BBP_ADJUSTED',
-                'BBP_ADJUSTED_QC',
-                'BBP_ADJUSTED_ERROR',
-                'BBP470',
-                'BBP470_QC',
-                'BBP470_dPRES',
-                'BBP470_ADJUSTED',
-                'BBP470_ADJUSTED_QC',
-                'BBP470_ADJUSTED_ERROR',
-                'BBP532',
-                'BBP532_QC',
-                'BBP532_dPRES',
-                'BBP532_ADJUSTED',
-                'BBP532_ADJUSTED_QC',
-                'BBP532_ADJUSTED_ERROR',
-                'BBP700',
-                'BBP700_QC',
-                'BBP700_dPRES',
-                'BBP700_ADJUSTED',
-                'BBP700_ADJUSTED_QC',
-                'BBP700_ADJUSTED_ERROR',
-                'TURBIDITY',
-                'TURBIDITY_QC',
-                'TURBIDITY_dPRES',
-                'TURBIDITY_ADJUSTED',
-                'TURBIDITY_ADJUSTED_QC',
-                'TURBIDITY_ADJUSTED_ERROR',
-                'CP',
-                'CP_QC',
-                'CP_dPRES',
-                'CP_ADJUSTED',
-                'CP_ADJUSTED_QC',
-                'CP_ADJUSTED_ERROR',
-                'CP660',
-                'CP660_QC',
-                'CP660_dPRES',
-                'CP660_ADJUSTED',
-                'CP660_ADJUSTED_QC',
-                'CP660_ADJUSTED_ERROR',
-                'CHLA',
-                'CHLA_QC',
-                'CHLA_dPRES',
-                'CHLA_ADJUSTED',
-                'CHLA_ADJUSTED_QC',
-                'CHLA_ADJUSTED_ERROR',
-                'CDOM',
-                'CDOM_QC',
-                'CDOM_dPRES',
-                'CDOM_ADJUSTED',
-                'CDOM_ADJUSTED_QC',
-                'CDOM_ADJUSTED_ERROR',
-                'NITRATE',
-                'NITRATE_QC',
-                'NITRATE_dPRES',
-                'NITRATE_ADJUSTED',
-                'NITRATE_ADJUSTED_QC',
-                'NITRATE_ADJUSTED_ERROR',
-                'BISULFIDE',
-                'BISULFIDE_QC',
-                'BISULFIDE_dPRES',
-                'BISULFIDE_ADJUSTED',
-                'BISULFIDE_ADJUSTED_QC',
-                'BISULFIDE_ADJUSTED_ERROR',
-                'PH_IN_SITU_TOTAL',
-                'PH_IN_SITU_TOTAL_QC',
-                'PH_IN_SITU_TOTAL_dPRES',
-                'PH_IN_SITU_TOTAL_ADJUSTED',
-                'PH_IN_SITU_TOTAL_ADJUSTED_QC',
-                'PH_IN_SITU_TOTAL_ADJUSTED_ERROR',
-                'DOWN_IRRADIANCE',
-                'DOWN_IRRADIANCE_QC',
-                'DOWN_IRRADIANCE_dPRES',
-                'DOWN_IRRADIANCE_ADJUSTED',
-                'DOWN_IRRADIANCE_ADJUSTED_QC',
-                'DOWN_IRRADIANCE_ADJUSTED_ERROR',
-                'DOWN_IRRADIANCE380',
-                'DOWN_IRRADIANCE380_QC',
-                'DOWN_IRRADIANCE380_dPRES',
-                'DOWN_IRRADIANCE380_ADJUSTED',
-                'DOWN_IRRADIANCE380_ADJUSTED_QC',
-                'DOWN_IRRADIANCE380_ADJUSTED_ERROR',
-                'DOWN_IRRADIANCE412',
-                'DOWN_IRRADIANCE412_QC',
-                'DOWN_IRRADIANCE412_dPRES',
-                'DOWN_IRRADIANCE412_ADJUSTED',
-                'DOWN_IRRADIANCE412_ADJUSTED_QC',
-                'DOWN_IRRADIANCE412_ADJUSTED_ERROR',
-                'DOWN_IRRADIANCE443',
-                'DOWN_IRRADIANCE443_QC',
-                'DOWN_IRRADIANCE443_dPRES',
-                'DOWN_IRRADIANCE443_ADJUSTED',
-                'DOWN_IRRADIANCE443_ADJUSTED_QC',
-                'DOWN_IRRADIANCE443_ADJUSTED_ERROR',
-                'DOWN_IRRADIANCE490',
-                'DOWN_IRRADIANCE490_QC',
-                'DOWN_IRRADIANCE490_dPRES',
-                'DOWN_IRRADIANCE490_ADJUSTED',
-                'DOWN_IRRADIANCE490_ADJUSTED_QC',
-                'DOWN_IRRADIANCE490_ADJUSTED_ERROR',
-                'DOWN_IRRADIANCE555',
-                'DOWN_IRRADIANCE555_QC',
-                'DOWN_IRRADIANCE555_dPRES',
-                'DOWN_IRRADIANCE555_ADJUSTED',
-                'DOWN_IRRADIANCE555_ADJUSTED_QC',
-                'DOWN_IRRADIANCE555_ADJUSTED_ERROR',
-                'UP_IRRADIANCE',
-                'UP_IRRADIANCE_QC',
-                'UP_IRRADIANCE_dPRES',
-                'UP_IRRADIANCE_ADJUSTED',
-                'UP_IRRADIANCE_ADJUSTED_QC',
-                'UP_IRRADIANCE_ADJUSTED_ERROR',
-                'UP_IRRADIANCE380',
-                'UP_IRRADIANCE380_QC',
-                'UP_IRRADIANCE380_dPRES',
-                'UP_IRRADIANCE380_ADJUSTED',
-                'UP_IRRADIANCE380_ADJUSTED_QC',
-                'UP_IRRADIANCE380_ADJUSTED_ERROR',
-                'UP_IRRADIANCE412',
-                'UP_IRRADIANCE412_QC',
-                'UP_IRRADIANCE412_dPRES',
-                'UP_IRRADIANCE412_ADJUSTED',
-                'UP_IRRADIANCE412_ADJUSTED_QC',
-                'UP_IRRADIANCE412_ADJUSTED_ERROR',
-                'UP_IRRADIANCE443',
-                'UP_IRRADIANCE443_QC',
-                'UP_IRRADIANCE443_dPRES',
-                'UP_IRRADIANCE443_ADJUSTED',
-                'UP_IRRADIANCE443_ADJUSTED_QC',
-                'UP_IRRADIANCE443_ADJUSTED_ERROR',
-                'UP_IRRADIANCE490',
-                'UP_IRRADIANCE490_QC',
-                'UP_IRRADIANCE490_dPRES',
-                'UP_IRRADIANCE490_ADJUSTED',
-                'UP_IRRADIANCE490_ADJUSTED_QC',
-                'UP_IRRADIANCE490_ADJUSTED_ERROR',
-                'UP_IRRADIANCE555',
-                'UP_IRRADIANCE555_QC',
-                'UP_IRRADIANCE555_dPRES',
-                'UP_IRRADIANCE555_ADJUSTED',
-                'UP_IRRADIANCE555_ADJUSTED_QC',
-                'UP_IRRADIANCE555_ADJUSTED_ERROR',
-                'DOWNWELLING_PAR',
-                'DOWNWELLING_PAR_QC',
-                'DOWNWELLING_PAR_dPRES',
-                'DOWNWELLING_PAR_ADJUSTED',
-                'DOWNWELLING_PAR_ADJUSTED_QC',
-                'DOWNWELLING_PAR_ADJUSTED_ERROR'
-            ]
-
+        if self.db_type in ["PHY","BGC"]:
+            self.VARS = params.params["Argo"+self.db_type].copy()
         else:
-            print("Variables list to read from Argo files not provided.")
+            raise ValueError("List of variables to read from Argo files not provided.")
 
         return
+
+#------------------------------------------------------------------------------#
+## Assign data mode to each parameter
+    def __assign_data_mode(self,ds):
+        """Spread 'PARAM_DATA_MODE' value across as many <PARAM>_DATA_MODE
+        variables as N_PARAM in the dataset
+
+        Arguments:
+        ds    -- xarray Argo dataset
+
+        Returns:
+        ds    -- xarray Argo dataset with <PARAM>_DATA_MODE variables
+        """
+
+        nparam = ds.sizes["N_PARAM"]
+        nprof = ds.sizes["N_PROF"]
+        nlevels = ds.sizes["N_LEVELS"]
+        for v in self.VARS:
+            if "_DATA_MODE" in v:
+                ds[v] = xr.DataArray(
+                    np.full( (nprof,nlevels), "", dtype=str ),
+                    dims=["N_PROF","N_LEVELS"]
+                )
+
+        parameter = ds["PARAMETER"].isel(N_CALIB=0)
+        skipped_params = []
+        for p in range(nparam):
+            for j in range(nprof):
+
+                param_name = str(parameter.isel(N_PARAM=p,N_PROF=j).values).strip()
+                if len(param_name) < 1:
+                    continue
+
+                param_data_mode_name = param_name + "_DATA_MODE"
+                if param_data_mode_name not in self.VARS:
+                    if param_data_mode_name not in skipped_params:
+                        skipped_params.append(param_data_mode_name)
+                    continue
+
+                data_mode = str( ds["PARAMETER_DATA_MODE"].isel(N_PARAM=p,N_PROF=j).values ).strip()
+                if len(data_mode) > 1:
+                    raise ValueError("Data mode should be a one-character long string.")
+
+                for k in range(nlevels):
+                    ds[param_data_mode_name][j,k] = data_mode
+
+        if len(skipped_params)>0:
+            print("The following parameters were not found in the target variables to be converted, its <PARAM>_DATA_MODE has not been created: ")
+            print(skipped_params)
+
+        return ds
 
 ##########################################################################
 
