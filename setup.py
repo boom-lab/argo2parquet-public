@@ -9,7 +9,7 @@ def parse_requirements(filename):
 
 setup(
     name='argo2parquet',
-    version='0.1',
+    version='0.1.1',
     description='Module to convert Argo netCDF database to parquet',
     license="GNU GPLv3",
     long_description=long_description,
