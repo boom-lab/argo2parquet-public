@@ -70,7 +70,7 @@ def argo_convert( flists, metadata, db_names, outdir_parquet, schema_path):
 
         daskConverter = daskTools(
             db_type = db_name.upper(),
-            out_dir = outdir_parquet+db_name,
+            out_dir = outdir_parquet,
             flist = flist,
             schema_path = schema_fname,
             chunk = chunksize,

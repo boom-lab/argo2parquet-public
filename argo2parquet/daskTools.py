@@ -114,7 +114,6 @@ class daskTools():
 
             # updating data modes for BGC argo floats data
             if 'PARAMETER_DATA_MODE' in list(ds.data_vars):
-                print("Assigning DATA_MODE to <PARAM>_DATA_MODE variables.")
                 if (ds['PARAMETER'].isel(N_CALIB=0) == ds['PARAMETER']).all():
                     ds = self.__assign_data_mode(ds)
                 else:
@@ -140,7 +139,6 @@ class daskTools():
             print('Processing    ' + str(argo_file))
 
         #ensures that all data frames have all the columns and in the same order; it creates NaNs where not present
-
         df = df.reindex( columns=self.VARS )
 
         # enforcing dtypes otherwise to_parquet() gives error when appending
@@ -172,12 +170,6 @@ class daskTools():
             endchunk = (j+1)*chunk
             if endchunk > len(flist):
                 endchunk = len(flist)
-
-            #df = []
-            #for idx, file in enumerate( flist[initchunk:endchunk] ):
-                #df_tmp, okflag = self.read_argo(file)
-                #df.append(df_tmp)
-                #self.failed_reads[idx+initchunk]=okflag
 
             df = [ self.read_argo(file) for file in flist[initchunk:endchunk] ]
 
@@ -311,21 +303,30 @@ class daskTools():
                 )
 
         parameter = ds["PARAMETER"].isel(N_CALIB=0)
+        skipped_params = []
         for p in range(nparam):
             for j in range(nprof):
 
-                param_name = str(parameter.isel(N_PARAM=p,N_PROF=p).values).strip()
+                param_name = str(parameter.isel(N_PARAM=p,N_PROF=j).values).strip()
+                if len(param_name) < 1:
+                    continue
+
                 param_data_mode_name = param_name + "_DATA_MODE"
+                if param_data_mode_name not in self.VARS:
+                    if param_data_mode_name not in skipped_params:
+                        skipped_params.append(param_data_mode_name)
+                    continue
 
                 data_mode = str( ds["PARAMETER_DATA_MODE"].isel(N_PARAM=p,N_PROF=j).values ).strip()
                 if len(data_mode) > 1:
-                    print(data_mode)
-                    print(type(data_mode))
-                    print(len(data_mode))
                     raise ValueError("Data mode should be a one-character long string.")
 
                 for k in range(nlevels):
                     ds[param_data_mode_name][j,k] = data_mode
+
+        if len(skipped_params)>0:
+            print("The following parameters were not found in the target variables to be converted, its <PARAM>_DATA_MODE has not been created: ")
+            print(skipped_params)
 
         return ds
 
