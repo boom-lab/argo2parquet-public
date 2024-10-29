@@ -111,10 +111,20 @@ class daskTools():
 
         try:
             ds = xr.open_dataset(argo_file, engine="argo") #loading into memory the profile
-            invars = list(set(self.VARS) & set(list(ds.data_vars)))
+
+            # updating data modes for BGC argo floats data
+            if 'PARAMETER_DATA_MODE' in list(ds.data_vars):
+                if (ds['PARAMETER'].isel(N_CALIB=0) == ds['PARAMETER']).all():
+                    ds = self.__assign_data_mode(ds)
+                else:
+                    raise ValueError("PARAMETER not independent of N_CALIB.")
+            
+            ds_vars = list(ds.data_vars)
+            invars = list(set(self.VARS) & set(ds_vars))
             df = ds[invars].to_dataframe()
             df = df.reset_index() #flatten dataframe
             okflag = 1
+
         except Exception as e:
             print("The following exception occurred:", e)
             okflag = 0
@@ -161,12 +171,6 @@ class daskTools():
             if endchunk > len(flist):
                 endchunk = len(flist)
 
-            #df = []
-            #for idx, file in enumerate( flist[initchunk:endchunk] ):
-                #df_tmp, okflag = self.read_argo(file)
-                #df.append(df_tmp)
-                #self.failed_reads[idx+initchunk]=okflag
-
             df = [ self.read_argo(file) for file in flist[initchunk:endchunk] ]
 
             df = dd.from_delayed(df) # creating unique df from list of df
@@ -179,6 +183,7 @@ class daskTools():
             append_db = False
             if j>0:
                 append_db = True # append to pre-existing partition
+            overwrite_db = not append_db
 
             df.to_parquet(
                 out_dir,
@@ -187,7 +192,8 @@ class daskTools():
                 append = append_db,
                 write_metadata_file = True,
                 write_index=False,
-                schema = self.schema
+                schema = self.schema,
+                overwrite = overwrite_db
             )
 
             print()
@@ -272,6 +278,57 @@ class daskTools():
             raise ValueError("List of variables to read from Argo files not provided.")
 
         return
+
+#------------------------------------------------------------------------------#
+## Assign data mode to each parameter
+    def __assign_data_mode(self,ds):
+        """Spread 'PARAM_DATA_MODE' value across as many <PARAM>_DATA_MODE
+        variables as N_PARAM in the dataset
+
+        Arguments:
+        ds    -- xarray Argo dataset
+
+        Returns:
+        ds    -- xarray Argo dataset with <PARAM>_DATA_MODE variables
+        """
+
+        nparam = ds.sizes["N_PARAM"]
+        nprof = ds.sizes["N_PROF"]
+        nlevels = ds.sizes["N_LEVELS"]
+        for v in self.VARS:
+            if "_DATA_MODE" in v:
+                ds[v] = xr.DataArray(
+                    np.full( (nprof,nlevels), "", dtype=str ),
+                    dims=["N_PROF","N_LEVELS"]
+                )
+
+        parameter = ds["PARAMETER"].isel(N_CALIB=0)
+        skipped_params = []
+        for p in range(nparam):
+            for j in range(nprof):
+
+                param_name = str(parameter.isel(N_PARAM=p,N_PROF=j).values).strip()
+                if len(param_name) < 1:
+                    continue
+
+                param_data_mode_name = param_name + "_DATA_MODE"
+                if param_data_mode_name not in self.VARS:
+                    if param_data_mode_name not in skipped_params:
+                        skipped_params.append(param_data_mode_name)
+                    continue
+
+                data_mode = str( ds["PARAMETER_DATA_MODE"].isel(N_PARAM=p,N_PROF=j).values ).strip()
+                if len(data_mode) > 1:
+                    raise ValueError("Data mode should be a one-character long string.")
+
+                for k in range(nlevels):
+                    ds[param_data_mode_name][j,k] = data_mode
+
+        if len(skipped_params)>0:
+            print("The following parameters were not found in the target variables to be converted, its <PARAM>_DATA_MODE has not been created: ")
+            print(skipped_params)
+
+        return ds
 
 ##########################################################################
 
