@@ -9,7 +9,8 @@ NB: the development is ongoing and in its infant stage, more complete documentat
 ### Table of Contents
 1. [Installation and usage](#installation)
 2. [Reading parquet database](#reading-parquet-database)
-3. [Contact](#contact)
+3. [Log](#log)
+4. [Contact](#contact)
 
 ### Installation and usage
 From the root directory, install it locally as:
@@ -50,8 +51,8 @@ The notebooks also report reading times, which might not match what you get as t
 
 ### Log
 
-2024-10-29: (v0.1.1) Added DIRECTION and DATA_MODE data to both Core and BGC parquet databases.
-2024-09-13: (v0.1) First release.
+* 2024-10-29: (v0.1.1) Added DIRECTION and DATA_MODE data to both Core and BGC parquet databases.
+* 2024-09-13: (v0.1) First release.
 
 ### Contact
 
