@@ -85,13 +85,11 @@ def argo_gdac(gdac_path='./', dataset="bgc", lat_range=None,lon_range=None,start
 
     if not os.path.exists(gdac_path + gdac_name):
         print(gdac_name + ' not found in ' + gdac_path + '. Downloading it.')
-
         Path(gdac_path).mkdir(parents = True, exist_ok = True)
-        
-        gdac_url  = 'https://usgodae.org/pub/outgoing/argo/'
 
-        args = (gdac_url,gdac_name,gdac_path,True,verbose,checktime,None)
-        download_file(args)
+    gdac_url  = 'https://usgodae.org/pub/outgoing/argo/'
+    args = (gdac_url,gdac_name,gdac_path,True,verbose,checktime,None)
+    download_file(args)
 
   # Load index file into Pandas DataFrame
     gdac_file = gdac_path+gdac_name
